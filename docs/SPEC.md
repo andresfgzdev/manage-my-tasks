@@ -196,8 +196,8 @@ All in `src/features/tasks/domain/`. Relative imports **with `.ts`**, no alias, 
 All in `src/components/ds/`, client only if they have state/events. Exact classes (adjustable by ±1 px only if something does not align). Each primitive respects `prefers-reduced-motion` (already global from T1.3).
 
 ### T5.1 `tick.tsx`
-- On top of `components/ui/checkbox` (radix). Root: `size-[22px] rounded-[7px] border-[1.5px] border-faint bg-transparent transition-[background-color,border-color,transform] duration-[180ms] active:scale-90 data-[state=checked]:bg-moss data-[state=checked]:border-moss focus-visible:ring-2 focus-visible:ring-sodium/60`.
-- Indicator: SVG 14×14 `path d="M3 7.2l2.6 2.6L11 4.4"` `stroke-ground stroke-[2.2]` with `stroke-dasharray:16; stroke-dashoffset:16` → `0` when `checked`, transition 220 ms `ease-out-strong` with a 60 ms delay.
+- Built directly on the radix `Checkbox` primitive (`import { Checkbox } from "radix-ui"`), because the shadcn `Checkbox` renders its own indicator; `components/ui/checkbox.tsx` becomes unused (T9.2 deletes it). Root: `size-[22px] rounded-[7px] border-[1.5px] border-faint bg-transparent transition-[background-color,border-color,transform] duration-[180ms] active:scale-90 data-[state=checked]:bg-moss data-[state=checked]:border-moss focus-visible:ring-2 focus-visible:ring-sodium/60`.
+- Check mark: a plain SVG child (not `Indicator`, which unmounts) 14×14 `path d="M3 7.2l2.6 2.6L11 4.4"` `stroke-ground stroke-[2.2]` with `stroke-dasharray:16; stroke-dashoffset:16` → `0` when `checked`, transition 220 ms `ease-out-strong` with a 60 ms delay.
 - `aria-label={label}`.
 
 ### T5.2 `chip.tsx`
@@ -211,8 +211,8 @@ All in `src/components/ds/`, client only if they have state/events. Exact classe
 - Logic: `pointerdown`/`keydown` (Space or Enter, no auto-repeat) start a timer of `holdMs`; `pointerup`/`pointerleave`/`keyup`/`blur` cancel it; when it completes it calls `onConfirm()` once. `aria-label={label}`, `title={label}`.
 
 ### T5.4 `duration-rule.tsx` and `priority-bars.tsx`
-- `DurationRule`: track `w-[140px] h-[3px] rounded-sm bg-raise overflow-hidden`; fill `h-full rounded-sm` width `max(6, min(minutes, max)/max*100)%` (0 → 0%), colour `bg-ash` or `bg-moss` if `done`, `transition-colors duration-[220ms]`; text beside it `font-mono text-[11px] text-ash` with `formatDuration` or `"no duration"`.
-- `PriorityBars`: 3 bars `w-[3px] rounded-[1px]` of height 7/10/13 px, `bg-sodium` if `n <= priority` otherwise `bg-line`; container `aria-label="Priority {none|low|medium|high}"`.
+- `DurationRule` (props `minutes`, `label`, `done?`, `max?`; the caller passes the formatted `label`, e.g. `formatDuration(m) || "no duration"`, so `ds` never imports from `features`): track `w-[140px] h-[3px] rounded-sm bg-raise overflow-hidden`; fill `h-full rounded-sm` width `max(6, min(minutes, max)/max*100)%` (0 → 0%), colour `bg-ash` or `bg-moss` if `done`, `transition-colors duration-[220ms]`; text beside it `font-mono text-[11px] text-ash` showing `label`.
+- `PriorityBars` (prop type is the literal `0 | 1 | 2 | 3`, not imported from the domain): 3 bars `w-[3px] rounded-[1px]` of height 7/10/13 px, `bg-sodium` if `n <= priority` otherwise `bg-line`; container `aria-label="Priority {none|low|medium|high}"`.
 
 ### T5.5 `now-marker.tsx` and `segment-meter.tsx`
 - `NowMarker`: row `h-7 flex items-center`; label `w-[52px] text-right font-mono text-xs text-sodium`; dot `size-[9px] rounded-full bg-sodium ml-2.5 animate-[now-pulse_2400ms_ease-in-out_infinite]`; line `flex-1 h-px bg-linear-to-r from-sodium to-transparent`. `aria-label="Now, {label}"`.
@@ -221,13 +221,10 @@ All in `src/components/ds/`, client only if they have state/events. Exact classe
 ### T5.6 `lens-tabs.tsx`
 - `nav` `relative flex border-b border-line overflow-x-auto`; each item `next/link` `w-28 h-11 inline-flex items-center justify-center text-sm text-ash aria-[current=page]:text-bone transition-colors press`; counter `ml-1.5 font-mono text-[11px] text-ash-dim`; `disabled` → `span` `text-faint cursor-not-allowed aria-disabled`.
 - Indicator `absolute left-0 -bottom-px w-28 h-0.5 bg-sodium transition-transform duration-[260ms] ease-in-out-strong` with `translateX(index * 112px)`.
-- Client (uses `usePathname` for `activeHref` if not passed).
+- Client. `activeHref` is optional and defaults to `usePathname()`. The indicator sits at `bottom-0` (not `-bottom-px`: that overflows the `overflow-x-auto` nav and shows a vertical scrollbar).
 
-### T5.7 Design system catalogue (`/ds`)
-- **File:** `src/app/(dev)/ds/page.tsx` (listed in the [A§6] tree).
-- **Content:** if `process.env.NODE_ENV === "production"` → `notFound()`. Sections: swatches for every colour token (name + hex + usage, from [A§8]); the type scale from [A§8]; each primitive in all its states (Tick on/off/disabled, the 3 Chip tones, HoldButton, DurationRule 0/30/90/180 and done, PriorityBars 0–3, NowMarker, SegmentMeter, LensTabs); shadcn buttons in their variants; a motion table with a "play" button per animation.
-- **Acceptance:** `/ds` shows everything with no console errors; under `npm run build && npm start` it returns 404.
-- **Do not:** Storybook; dependencies; documentation outside this page.
+### T5.7 Design system catalogue (removed)
+- A `/ds` catalogue page was built once, in development, to verify the primitives in a browser (all states, motion durations, hold-to-delete behaviour) and was then **deleted on purpose**: no catalogue page ships in the repo. Do not recreate it. Verify primitives in the real views (phase 6 onwards).
 
 ---
 
@@ -310,7 +307,7 @@ All in `src/components/ds/`, client only if they have state/events. Exact classe
 
 ### T9.2 Cleanup
 - Delete components in `src/components/ui/` with no importers (`grep`), unused `button` variants, and unused dependencies in `package.json` (check `next-themes`: it stays only if `sonner.tsx` still imports it; otherwise uninstall).
-- `grep -rnE "#[0-9a-fA-F]{3,6}\b" src --include=*.tsx` → empty (except `/ds` showing hex values as text).
+- `grep -rnE "#[0-9a-fA-F]{3,6}\b" src --include=*.tsx` → empty.
 - `grep -rnP "[áéíóúñ¿¡]" src` → empty (no Spanish left in the app).
 
 ### T9.3 README

@@ -301,7 +301,6 @@ manage-my-tasks/
 │   │   ├── globals.css                # tokens + base + motion utilities (section 8)
 │   │   ├── page.tsx                   # redirect("/today")
 │   │   ├── providers.tsx              # "use client": QueryClientProvider (+ devtools in dev)
-│   │   ├── (dev)/ds/page.tsx          # design system catalogue (404 in production)
 │   │   ├── (app)/
 │   │   │   ├── layout.tsx             # AppShell + QuickAddProvider + QuickAdd
 │   │   │   ├── today/page.tsx
@@ -487,14 +486,14 @@ Rules: animate only `transform`, `opacity`, `filter`, `clip-path`, colours; neve
 
 | Component | Props (interface) | States | Built on | Board |
 |---|---|---|---|---|
-| `Tick` | `checked: boolean; onCheckedChange(v: boolean): void; label: string; disabled?: boolean` | idle, hover, pressed (scale .9), checked (moss + drawn check), disabled | `components/ui/checkbox` (radix), restyled | Today |
+| `Tick` | `checked: boolean; onCheckedChange(v: boolean): void; label: string; disabled?: boolean` | idle, hover, pressed (scale .9), checked (moss + drawn check), disabled | the radix `Checkbox` primitive (shadcn's bakes in its own indicator) | Today |
 | `Chip` | `tone: "sodium" \| "neutral" \| "hint"; kind?: string; children` | enters with `animate-chip-in`; `hint` = dashed border | `span` | Today, QuickAdd |
 | `HoldButton` | `onConfirm(): void; label: string; holdMs?: number (700); children (icon)` | idle, holding (ember fill), cancelled (returns in 200 ms) | `button`; pointer **and** keyboard (hold Space/Enter) | Today, Motion |
-| `DurationRule` | `minutes: number; done?: boolean; max?: number (120)` | empty (0), partial, full; moss if `done` | `span` | Today |
+| `DurationRule` | `minutes: number; label: string; done?: boolean; max?: number (120)` (the caller formats `label`, so `ds` never imports from `features`) | empty (0), partial, full; moss if `done` | `span` | Today |
 | `PriorityBars` | `priority: Priority` | 0–3 sodium bars; `aria-label` "Priority medium" | `span` | Today |
 | `NowMarker` | `label: string` | soft pulse; no pulse with reduced-motion | `div` | Today, Week |
 | `SegmentMeter` | `segments: boolean[]; label: string` | moss segment = done | `div` | Today (header) |
-| `LensTabs` | `items: { href: string; label: string; count?: number; disabled?: boolean }[]; activeHref: string` | sliding indicator, 112 px per tab | `next/link` + `nav` | Today, Week |
+| `LensTabs` | `items: { href: string; label: string; count?: number; disabled?: boolean }[]; activeHref?: string` (defaults to `usePathname()`) | sliding indicator, 112 px per tab | `next/link` + `nav` | Today, Week |
 
 shadcn components used (vendored, restyled only through tokens/variants): `button`, `input`, `checkbox`, `popover` (**add** with `npx shadcn@latest add popover`), `dropdown-menu`, `tooltip`, `sonner`, `separator`, `collapsible`. Popovers use `transform-origin: var(--radix-popover-content-transform-origin)`.
 
@@ -561,7 +560,7 @@ Behaviours: a click without dragging creates a 1 h block (default `selectMinDist
 
 ## 11. Implementation sequence
 
-The task-by-task detail is in **`docs/SPEC.md`**; the design system is built there (foundation in phase 1, primitives and the `/ds` catalogue in phase 5) and the later phases are required to use it. Each phase ends with `npx tsc --noEmit`, `npm run lint`, `npm test` and `npm run build` green.
+The task-by-task detail is in **`docs/SPEC.md`**; the design system is built there (foundation in phase 1, primitives in phase 5) and the later phases are required to use it. Each phase ends with `npx tsc --noEmit`, `npm run lint`, `npm test` and `npm run build` green.
 
 ## 12. Definition of done (global)
 
