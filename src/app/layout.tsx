@@ -3,6 +3,7 @@ import "./globals.css";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import type { Metadata } from "next";
+import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/sonner";
 
 const dmSans = DM_Sans({
@@ -30,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
       <body>
-        {children}
+        <Providers>{children}</Providers>
         <Toaster />
       </body>
     </html>
