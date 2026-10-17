@@ -1,14 +1,11 @@
 import CreateNewTask from "@/components/tasks/create-new-task";
 import Greetings from "@/components/layout/greetings";
 import ListTasks from "@/components/tasks/list-tasks";
-import { NotSignedIn } from "@/components/auth/not-signed-in";
 import { Separator } from "@/components/ui/separator";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/session";
 
-export default async function Tasks() {
-  const { userId } = await auth();
-
-  if (!userId) return <NotSignedIn />;
+export default function Tasks() {
+  const { id: userId } = getCurrentUser();
 
   return (
     <section className="w-full flex min-h-[calc(100%-40px)] justify-center px-8 font-inter">

@@ -10,7 +10,7 @@ import {
 } from "../ui/select";
 
 import { Input } from "../ui/input";
-import { RippleButton } from "../animate-ui/buttons/ripple";
+import { Button } from "../ui/button";
 import { newTaskForm } from "@/types";
 import { useState } from "react";
 
@@ -109,7 +109,7 @@ export default function NewTaskForm({
           </Select>
         </div>
         <div className="w-full flex flex-row justify-center mt-4 gap-5">
-          <RippleButton
+          <Button
             variant="destructive"
             size="sm"
             onClick={() => setIsOpen(false)}
@@ -117,9 +117,9 @@ export default function NewTaskForm({
           >
             <X className="size-5" />
             <span>Cancel</span>
-          </RippleButton>
+          </Button>
 
-          <RippleButton
+          <Button
             variant="outline"
             size="sm"
             className="hover:text-purple-400"
@@ -127,7 +127,7 @@ export default function NewTaskForm({
           >
             <Plus className="size-5" />
             <span>Save Task</span>
-          </RippleButton>
+          </Button>
         </div>
       </div>
     </form>

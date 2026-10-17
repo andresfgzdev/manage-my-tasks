@@ -1,9 +1,12 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { connection } from "next/server";
+import { getCurrentUser } from "@/lib/session";
 
 export default async function Greetings() {
+  // Render per request so the greeting reflects the current time.
+  await connection();
   const now = new Date();
   const hour = now.getHours();
-  const user = await currentUser();
+  const user = getCurrentUser();
 
   let timeGreeting = "";
   if (hour >= 5 && hour < 12) {
@@ -27,7 +30,7 @@ export default async function Greetings() {
   return (
     <>
       <h4 className="text-xl font-bold">
-        {timeGreeting}, {user?.firstName} {emoji}
+        {timeGreeting}, {user.firstName} {emoji}
       </h4>
       <span className="text-sm text-gray-300">{formattedDate}</span>
     </>

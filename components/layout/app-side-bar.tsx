@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, List, ListTodo, Star, User } from "lucide-react";
+import { Briefcase, List, ListTodo, User } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +14,6 @@ import {
   SidebarMenuItem,
 } from "../ui/sidebar";
 
-import AppSideBarFooter from "./app-side-bar-footer";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -124,29 +123,12 @@ export function AppSideBar() {
                   </article>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-
-              <SidebarMenuItem key={"shared"}>
-                <SidebarMenuButton
-                  disabled
-                  className={cn(
-                    "h-12 px-3 text-md font-medium transition-colors rounded-2xl cursor-pointer",
-                    category === "shared" && "bg-muted text-foreground"
-                  )}
-                  onClick={() => setCategory("shared")}
-                >
-                  <article className="flex flex-row items-center gap-2">
-                    <Star color="#f59e0b" className="w-4 h-4" />
-                    <span>Shared (Refactoring)</span>
-                  </article>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu className="w-full">
-          <AppSideBarFooter />
           <span className="text-xs text-muted-foreground">
             Made with ❤️ by{" "}
             <a

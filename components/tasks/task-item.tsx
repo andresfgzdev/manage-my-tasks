@@ -1,8 +1,3 @@
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import {
-  AvatarGroup,
-  AvatarGroupTooltip,
-} from "../animate-ui/components/avatar-group";
 import {
   Briefcase,
   Check,
@@ -11,7 +6,6 @@ import {
   Edit,
   MoreVertical,
   Plus,
-  Star,
   Trash,
   User,
 } from "lucide-react";
@@ -20,7 +14,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../animate-ui/radix/collapsible";
+} from "../ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,15 +26,14 @@ import { useDeleteTask, useUpdateTask } from "@/hooks/use-tasks";
 
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Checkbox } from "../animate-ui/headless/checkbox";
+import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Separator } from "../ui/separator";
-import { ShareTask } from "./share-task";
 import SubtaskItem from "./subtask-item";
 import { Task } from "@/types";
 import { priorityColors } from "@/lib/constants";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCategory } from "@/context/CategoryProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -52,7 +45,7 @@ export default function TaskItem({ task }: { task: Task }) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const queryClient = useQueryClient();
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
 
   const handleCheckboxChange = async (task: Task) => {
     const newData = {
@@ -170,26 +163,6 @@ export default function TaskItem({ task }: { task: Task }) {
           "bg-accent/20 hover:border-accent/20  opacity-60 hover:opacity-70 hover:scale-100"
       )}
     >
-      {task?.shared_tasks?.length > 0 && (
-        <div className="absolute -top-4 left-4 z-10">
-          <AvatarGroup className="h-6 -space-x-2.5">
-            {task?.shared_tasks?.map((sharedUser) => (
-              <Avatar
-                key={sharedUser.id}
-                className="h-8 w-8 border-2 border-background"
-              >
-                <AvatarImage src={sharedUser.shared_with_img} />
-                <AvatarFallback>
-                  {sharedUser.shared_with_name.charAt(0)}
-                </AvatarFallback>
-                <AvatarGroupTooltip>
-                  <p>{sharedUser.shared_with_name}</p>
-                </AvatarGroupTooltip>
-              </Avatar>
-            ))}
-          </AvatarGroup>
-        </div>
-      )}
       <CardContent>
         <Collapsible disabled={isEditing}>
           <div className="flex flex-row justify-between items-center">
@@ -198,7 +171,7 @@ export default function TaskItem({ task }: { task: Task }) {
                 <Checkbox
                   checked={task.is_completed}
                   className="cursor-pointer size-4.5"
-                  onChange={() => handleCheckboxChange(task)}
+                  onCheckedChange={() => handleCheckboxChange(task)}
                   disabled={isEditing}
                 />
                 <div className="flex items-center gap-1.5">
@@ -206,8 +179,6 @@ export default function TaskItem({ task }: { task: Task }) {
                     <Briefcase color="#48fffd" className="size-5" />
                   ) : task.category === "personal" ? (
                     <User color="#10b981" className="size-5" />
-                  ) : task.category === "shared" ? (
-                    <Star color="#f59e0b" className="size-5" />
                   ) : (
                     ""
                   )}
@@ -301,7 +272,6 @@ export default function TaskItem({ task }: { task: Task }) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                    <ShareTask task={task} />
                   </div>
                 </div>
               </div>

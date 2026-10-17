@@ -5,11 +5,11 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../animate-ui/radix/collapsible";
+} from "../ui/collapsible";
 import { Plus, X } from "lucide-react";
 
 import NewTaskForm from "./new-task-form";
-import { RippleButton } from "../animate-ui/buttons/ripple";
+import { Button } from "../ui/button";
 import { newTaskForm } from "@/types";
 import { toast } from "sonner";
 import { useCreateTask } from "@/hooks/use-tasks";
@@ -43,23 +43,23 @@ export default function CreateNewTask() {
 
             <CollapsibleTrigger asChild hidden={isOpen}>
               <div className="w-full flex flex-row justify-center gap-2">
-                <RippleButton
+                <Button
                   variant="destructive"
                   size="sm"
                   className="hidden"
                 >
                   <X className="size-5" />
                   <span>Cancel</span>
-                </RippleButton>
+                </Button>
 
-                <RippleButton
+                <Button
                   variant="outline"
                   size="sm"
                   className=" hover:text-purple-500"
                 >
                   <Plus className="size-5" />
                   <span>New Task</span>
-                </RippleButton>
+                </Button>
               </div>
             </CollapsibleTrigger>
           </Collapsible>

@@ -1,13 +1,13 @@
 import { SubTask, Task } from "@/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { useAuth } from "@clerk/nextjs";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCategory } from "@/context/CategoryProvider";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 export const useCreateSubTasks = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
   const { category } = useCategory();
 
@@ -78,7 +78,7 @@ export const useCreateSubTasks = () => {
 };
 
 export const useUpdateSubTask = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
   const { category } = useCategory();
   return useMutation({
@@ -147,7 +147,7 @@ export const useUpdateSubTask = () => {
 };
 
 export const useDeleteSubTask = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
   const { category } = useCategory();
 

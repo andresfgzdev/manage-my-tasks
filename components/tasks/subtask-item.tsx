@@ -5,7 +5,7 @@ import {
   useUpdateSubTask,
 } from "@/hooks/use-subtasks";
 
-import { Checkbox } from "../animate-ui/headless/checkbox";
+import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { SubTask } from "@/types";
 import { cn } from "@/lib/utils";
@@ -108,7 +108,9 @@ export default function SubtaskItem({
           className="cursor-pointer size-4"
           checked={subtask.is_completed}
           disabled={parentCompleted}
-          onChange={() => handleUpdateSubTask(subtask, !subtask.is_completed)}
+          onCheckedChange={() =>
+            handleUpdateSubTask(subtask, !subtask.is_completed)
+          }
         />
         {isEditing ? (
           <Input

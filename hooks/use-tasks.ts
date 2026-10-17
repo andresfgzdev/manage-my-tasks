@@ -1,7 +1,7 @@
 import { Task, newTaskForm } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useAuth } from "@clerk/nextjs";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCategory } from "@/context/CategoryProvider";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
@@ -32,7 +32,7 @@ export const useTasks = ({
 };
 
 export const useCreateTask = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
   const { category } = useCategory();
 
@@ -100,7 +100,7 @@ export const useCreateTask = () => {
 };
 
 export const useUpdateTask = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -159,7 +159,7 @@ export const useUpdateTask = () => {
 };
 
 export const useDeleteTask = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useCurrentUser();
   const queryClient = useQueryClient();
 
   return useMutation({
