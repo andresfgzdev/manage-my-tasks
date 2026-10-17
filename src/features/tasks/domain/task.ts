@@ -81,7 +81,7 @@ const fieldValidators: Record<string, (v: unknown) => Result<unknown>> = {
   },
   startMin: (v) => {
     if (v === null) return { ok: true, value: null };
-    if (!isInt(v, 0, 1439) || v % 5 !== 0) return fail("Invalid start time");
+    if (!isInt(v, 0, 1439)) return fail("Invalid start time");
     return { ok: true, value: v };
   },
   durationMin: (v) =>

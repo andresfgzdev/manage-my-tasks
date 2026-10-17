@@ -40,7 +40,8 @@ test("validateDraft rejects a start time without a date", () => {
 
 test("validateDraft rejects out-of-range and malformed values", () => {
   assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 1440 }).ok, false);
-  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 603 }).ok, false);
+  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: -5 }).ok, false);
+  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 12.5 }).ok, false);
   assert.equal(validateDraft({ title: "x", durationMin: 1441 }).ok, false);
   assert.equal(validateDraft({ title: "x", durationMin: 1.5 }).ok, false);
   assert.equal(validateDraft({ title: "x", priority: 4 }).ok, false);
@@ -48,6 +49,12 @@ test("validateDraft rejects out-of-range and malformed values", () => {
   assert.equal(validateDraft({ title: "x", tag: "#work" }).ok, false);
   assert.equal(validateDraft({ title: "x", note: "n".repeat(5001) }).ok, false);
   assert.equal(validateDraft({ title: "x".repeat(201) }).ok, false);
+});
+
+test("validateDraft accepts any minute of the day as a start time", () => {
+  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 1267 }).ok, true);
+  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 0 }).ok, true);
+  assert.equal(validateDraft({ title: "x", date: "2026-10-17", startMin: 1439 }).ok, true);
 });
 
 test("validateDraft rejects unknown keys and non-objects", () => {
