@@ -225,7 +225,8 @@ export interface TaskStore {
   put(userId: string, task: Task): Promise<void>;          // insert or replace
   remove(userId: string, id: string): Promise<boolean>;
 }
-export function createMemoryTaskStore(): TaskStore;        // Map<userId, Map<id, Task>> on globalThis (survives HMR)
+export function createMemoryTaskStore(backing?: Map<string, Map<string, Task>>): TaskStore;
+// isolated by default (tests); default-tasks.ts passes a map kept on globalThis so data survives HMR
 
 // tasks.ts
 export type TasksModule = {

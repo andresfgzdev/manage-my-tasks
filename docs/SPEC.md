@@ -161,7 +161,7 @@ All in `src/features/tasks/domain/`. Relative imports **with `.ts`**, no alias, 
 - **Do not:** user types, name, avatar.
 
 ### T3.2 `task-store.ts`
-- **File:** `src/features/tasks/server/task-store.ts`, interface [A§5.3]. Memory on `globalThis.__tasksStore` (`Map<string, Map<string, Task>>`). `list` orders by `createdAt` ascending. Returns copies (`structuredClone`), never internal references.
+- **File:** `src/features/tasks/server/task-store.ts`, interface [A§5.3]. `createMemoryTaskStore(backing = new Map())`: isolated by default so every test gets its own store; the long-lived map on `globalThis.__tasksStore` is created in `default-tasks.ts` (T3.4) and passed in. `list` orders by `createdAt` ascending. Returns copies (`structuredClone`), never internal references.
 
 ### T3.3 `tasks.ts` + `tasks.test.ts`
 - **File:** `src/features/tasks/server/tasks.ts`, interface [A§5.3]. `create` applies defaults: `date: null, startMin: null, durationMin: 0, priority: 0, tag: null, done: false, steps: [], note: ""`.
