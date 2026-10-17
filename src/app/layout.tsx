@@ -1,20 +1,19 @@
 import "./globals.css";
 
-import { Inter, Nunito } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  variable: "--font-inter",
-  weight: ["400", "700"],
+const dmSans = DM_Sans({
   subsets: ["latin"],
+  variable: "--font-dm-sans",
+  axes: ["opsz"],
 });
 
-const nunito = Nunito({
-  variable: "--font-nunito",
-  weight: ["400", "700"],
+const mono = JetBrains_Mono({
   subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -29,14 +28,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="w-full">
-      <body
-        className={`${inter.variable} ${nunito.variable}  antialiased dark`}
-        suppressHydrationWarning
-        data-lt-installed
-      >
+    <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
+      <body>
         {children}
-        <Toaster position="top-right" expand={true} richColors />
+        <Toaster />
       </body>
     </html>
   );
