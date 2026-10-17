@@ -135,7 +135,7 @@ export type Task = {
   id: string;
   title: string;            // 1..200 chars, trimmed
   date: string | null;      // local "YYYY-MM-DD"; null = Inbox
-  startMin: number | null;  // 0..1439, multiple of 5; requires date !== null
+  startMin: number | null;  // 0..1439 (any minute); requires date !== null
   durationMin: number;      // 0..1440; 0 = no duration
   priority: Priority;
   tag: string | null;       // lowercase, no "#", /^[\p{L}\d_-]{1,32}$/u
