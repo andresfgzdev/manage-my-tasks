@@ -3,7 +3,6 @@ import "./globals.css";
 import { Inter, Nunito } from "next/font/google";
 
 import type { Metadata } from "next";
-import { ReactQueryClientProvider } from "@/providers/ReactQueryClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
@@ -36,10 +35,8 @@ export default function RootLayout({
         suppressHydrationWarning
         data-lt-installed
       >
-        <ReactQueryClientProvider>
-          {children}
-          <Toaster position="top-right" expand={true} richColors />
-        </ReactQueryClientProvider>
+        {children}
+        <Toaster position="top-right" expand={true} richColors />
       </body>
     </html>
   );
