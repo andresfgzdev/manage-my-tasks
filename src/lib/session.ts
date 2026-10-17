@@ -1,15 +1,6 @@
-// Temporary stand-in until real authentication is implemented.
-// Every request is treated as this single local user.
-export interface SessionUser {
-  id: string;
-  firstName: string;
-}
+import "server-only";
 
-export const DEMO_USER: SessionUser = {
-  id: "demo-user",
-  firstName: "Demo",
-};
-
-export function getCurrentUser(): SessionUser {
-  return DEMO_USER;
+// Entry point for future auth: every request is the same local user for now.
+export async function getCurrentUserId(): Promise<string> {
+  return "demo-user";
 }
