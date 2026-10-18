@@ -47,7 +47,7 @@ Analysis with `tidy-tree` (discover + inventory, read-only) and the *improve-cod
 - **Today**, **Next** and **Inbox** views (the day spine) and **Week** (calendar with range selection).
 - **The Line**: global floating quick add, with syntax for time, duration, priority, tag and day.
 - **Open task** inline, with sentence editing, steps and a note.
-- Complete with undo; delete with "hold to delete" and undo.
+- Complete with a tick; delete with a two-step delete button (no undo: the UI is the feedback).
 - Design system (tokens + primitives) and the component suite from sections 8–9.
 - **In-memory** persistence behind `TaskStore`.
 
@@ -86,7 +86,7 @@ Real authentication · database · task sharing and any people/shared UI (not ev
 | D6 | **Identity exists only on the server** via `getCurrentUserId()` (`src/lib/session.ts`). The client never sends `userId`. | Resolves H3 and leaves the seam ready for real auth. | Passing `userId` from the client. |
 | D7 | **FullCalendar v7** (`@fullcalendar/react` 7.1.x, a single package with subpaths) wrapped in a single `WeekCalendar` adapter. Styled with Tailwind classes through its `*Class` options (v7 class names are obfuscated, so selectors on `.fc-*` are not an option), no FullCalendar themes and no CSS file. | Ships range selection by dragging, snapping, now indicator and move/resize out of the box. The adapter isolates the FC API from the rest of the app. | Own calendar (more code); react-big-calendar (no rich selection); v6 packages (separate `@fullcalendar/timegrid`, `/interaction`, `/core`) — **do not install**. |
 | D8 | **Motion with CSS only** (transitions, keyframes, `@starting-style`). | No dependencies; runs off the main thread; already specified in the *Motion system* board. | `motion`/framer-motion. |
-| D9 | **Tests with `node --test`** (Node 24 runs TypeScript natively) only for `domain/` and `server/`. | Zero dependencies; covers the highest-risk logic (parser, views, validation, ownership). | Vitest/Jest (new dependency); UI tests (out of scope). |
+| D9 | **Tests with `node --test`** (Node 24 runs TypeScript natively) for `domain/`, `server/`, the framework-free sync core in `client/task-sync.ts` and the calendar's pure module. | Zero dependencies; covers the highest-risk logic (parser, views, validation, ownership, optimistic writes). | Vitest/Jest (new dependency); UI tests (out of scope). |
 | D10 | **Dark mode only.** `<html class="dark">` fixed, no toggle; the light theme block is removed. | Design requirement. | Theming with `next-themes` (the package is kept only because `components/ui/sonner.tsx` imports it; set `theme="dark"`). |
 | D11 | **The view is the route**: `/today`, `/next`, `/inbox`, `/week`. | Shareable URL, back button, no global category context. | State in context (`CategoryProvider`, removed). |
 | D12 | **Fonts:** DM Sans (primary, variable `wght` + `opsz`) and JetBrains Mono (times, durations, metadata), via `next/font/google`. | Requirement. Both verified in `next/font` 16.4 as variable fonts. | The canvas fonts (Schibsted Grotesk / Spline Sans Mono) are replaced. |
@@ -119,7 +119,7 @@ Real authentication · database · task sharing and any people/shared UI (not ev
           components/ds (primitives)  ·  components/ui (vendored shadcn)
 ```
 
-**Dependency direction (rule):** `app → features → components/ds → components/ui → lib`. `features/*/domain` imports no React, no Next, nothing outside itself. `features/calendar` may import `features/tasks/domain` and `features/tasks/client`; never the reverse. `components/ds` does not import from `features`.
+**Dependency direction (rule):** `app → features → components/ds → components/ui → lib`. `features/*/domain` imports no React, no Next, nothing outside itself. `features/calendar` may import `features/tasks/domain`, `features/tasks/client` and the three task entry points every view shares: `useQuickAdd`, `useTaskEditor` and `useTaskMenu`; never the reverse. `features/landing` may import `features/tasks/domain` and the clock (`client/use-now.ts`), nothing else. `components/ds` does not import from `features`.
 
 ### 5.2 Domain module — `src/features/tasks/domain/`
 
@@ -138,7 +138,7 @@ export type Task = {
   startMin: number | null;  // 0..1439 (any minute); requires date !== null
   durationMin: number;      // 0..1440; 0 = no duration
   priority: Priority;
-  tag: string | null;       // lowercase, no "#", /^[\p{L}\d_-]{1,32}$/u
+  tags: string[];           // max 8, each lowercase, no "#", /^[\p{L}\p{M}\d_-]{1,32}$/u
   done: boolean;
   steps: Step[];            // max 50
   note: string;             // max 5000 chars
@@ -147,7 +147,7 @@ export type Task = {
 };
 
 export type TaskDraft = { title: string } &
-  Partial<Pick<Task, "date" | "startMin" | "durationMin" | "priority" | "tag" | "note">>;
+  Partial<Pick<Task, "date" | "startMin" | "durationMin" | "priority" | "tags" | "note">>;
 export type TaskPatch = Partial<Omit<Task, "id" | "createdAt" | "updatedAt">>;
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -155,6 +155,10 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export function validateDraft(input: unknown): Result<TaskDraft>;
 export function validatePatch(input: unknown): Result<TaskPatch>;
 export function applyPatch(task: Task, patch: TaskPatch, nowIso: string): Result<Task>; // re-validates invariants
+export function newTask(draft: TaskDraft, id: string, nowIso: string): Task;            // the defaults, for server and client
+export function normalizeTag(raw: string): string | null;                               // the one tag rule
+export const MAX_TAGS = 8, MAX_DURATION = 1440;
+export const PRIORITY_NAMES: readonly ["none", "low", "medium", "high"];
 ```
 
 Invariants guaranteed by `validate*`/`applyPatch`: `startMin !== null ⇒ date !== null`; ranges from the table; unknown keys → error. Error messages are short English copy (they may reach the UI).
@@ -171,11 +175,12 @@ export type ParsedLine = {
   startMin: number | null;
   durationMin: number;
   priority: Priority;
-  tag: string | null;
+  tags: string[];
   tokens: LineToken[];                           // in order of appearance
 };
 
 export function parseLine(text: string, today: string /* YYYY-MM-DD */): ParsedLine;
+export const TOKEN_KIND_LABELS: Record<LineTokenKind, string>;  // "at", "lasts", "priority", "tag", "day"
 ```
 
 Exact grammar (each token separated by spaces; first match wins; the rest stays in the title). Keywords are English:
@@ -184,9 +189,10 @@ Exact grammar (each token separated by spaces; first match wins; the rest stays 
 |---|---|---|---|
 | 24 h time | `H:MM` / `HH:MM` (0–23, 00–59) | `startMin` | `time 15:30` |
 | 12 h time | `Ham` / `Hpm` (1–12) | `startMin` | `time 15:00` |
+| Range | `13:30 to 15:30`, `13:30-15:30`; a bare start takes the end's am/pm (`1:30-3pm` → 13:30) | `startMin` + `durationMin` | `time 13:30` + `lasts 2 h` |
 | Duration | `~Nm` / `~Nh` | `durationMin` | `for 45 min` / `1 h 30` |
 | Priority | `!` `!!` `!!!` | `priority` 1–3 | `priority low/medium/high` |
-| Tag | `#word` | `tag` | `tag #work` |
+| Tag | `#word`, `#a,b` | `tags` | `tag #work` |
 | Day | `today` / `tomorrow` | `date` | `day tomorrow` |
 
 If there is a time and no day → `date = today`. Nothing more: no "at 3", no "on monday", no recurrence (out of scope).
@@ -205,13 +211,19 @@ export function lensCounts(tasks: Task[], today: string): Record<Lens, number>;
 export function daySummary(tasks: Task[], today: string): {
   done: number; total: number; focusLeftMin: number; segments: boolean[]; // segments ordered by time
 };
-export function hourLoad(tasks: Task[], today: string, fromH: number, toH: number): number[];
+export function hourPlan(tasks: Task[], today: string, fromH: number, toH: number): { blocks: number; minutes: number }[];
 export function defaultDateFor(lens: Lens, today: string): string | null; // today→today, next→today+1, inbox→null
+export function lensOf(task: Pick<Task, "date" | "done">, today: string): Lens | null;
+export function isLate(startMin: number, durationMin: number, nowMin: number): boolean;
 ```
 
-`buildSpine` rules: *today* = `date === today`; *next* = `date > today` (ordered by date and time); *inbox* = `date === null`. Timed tasks first, ordered by `startMin`; the `now` marker only in *today*, before the first task with `startMin > nowMin` (at the end if none). Untimed tasks afterwards, under a `heading`. `overdue = lens==="today" && !done && startMin !== null && startMin + max(durationMin,0) < nowMin`.
+`buildSpine` rules: *today* = `date === today`, **plus unfinished tasks from earlier days** (carried over, always overdue, sorted first and always before `now`); *next* = `date > today` (ordered by date and time); *inbox* = `date === null`. Finished tasks from earlier days are in no lens. Timed tasks first, ordered by date and `startMin`; the `now` marker only in *today*, before the first of today's tasks with `startMin > nowMin` (at the end if none). Untimed tasks afterwards, under a `heading`. `overdue` (today only) = not done and either dated before today or `isLate(startMin, durationMin, nowMin)`.
 
-**`time.ts`** — `addDays(iso, n)`, `toIsoDate(d: Date)`, `formatHM(min)` → `"09:05"`, `formatDuration(min)` → `"45 min"` | `"1 h"` | `"1 h 30"`, `dayTitle(d)` → `{ name: "Friday", num: "Oct 17" }`, `shiftOf(hour)` → `"morning" | "afternoon" | "evening"`, `weekRange(today)` → `{ from, to }` (Monday–Sunday).
+**`edit.ts`** — the vocabulary of edits every editing surface uses, so none re-derives a task rule: `setDay(date)` (removing the day removes the time), `setTime(task, startMin, today)` (a time on an undated task puts it on today), `readTimeText`, `clampDuration`, `readTags` / `formatTags`, `toggleStep`, `addStep`, `editAll(fields, today)` (the edit dialog), `PRIORITY_CHOICES`, `DURATION_SHORTCUTS`.
+
+**`line.ts`** — The Line's policy. `placeLine(text, today, where)` with `where = { view: Lens } | { view: "week"; block: Block | null }` returns `{ line, draft, lands, needsTime }`: the block wins over typed times, a typed day wins over the view, without a day the task goes to the view it was typed in (Week: today), and on Week a task needs a time. `describeDraft(draft, today)` reads a draft back as a sentence. QuickAdd and the landing both use it.
+
+**`time.ts`** — `addDays(iso, n)`, `toIsoDate(d: Date)`, `minuteOfDay(d)`, `formatHM(min)` → `"09:05"`, `formatDuration(min)` → `"45 min"` | `"1 h"` | `"1 h 30"`, `formatRange(start, duration)` → `"13:30 → 15:30"` (wraps midnight), `dayTitle(d)` / `isoDayTitle(iso)` → `{ name: "Friday", num: "Oct 17" }`, `relativeDay(date, today)` → `"today" | "tomorrow" | "Oct 20" | "no date"`, `weekTitle(from, to)` → `"Oct 12–18"` / `"Oct 26 – Nov 1"`, `formatBlock(date, start, duration)` → `"Wed 22 · 15:30 → 17:00 · 1 h 30"`, `shiftOf(hour)`, `weekRange(today)` → `{ from, to }` (Monday–Sunday), `isoWeek(iso)`. Components never parse ISO dates or call `Date` getters for labels themselves.
 
 ### 5.3 Server module — `src/features/tasks/server/`
 
@@ -259,20 +271,29 @@ Errors: validation → `{ ok:false, error }` (HTTP 400); another user's task or 
 
 ### 5.4 Client module — `src/features/tasks/client/`
 
-**Deep:** hides the query key, optimistic updates, rollback and undo toasts. Nobody else touches `queryClient` for tasks.
+**Deep:** hides the query key, the QueryClient, optimistic writes, their ordering, rollback and the copy in `localStorage`. Nobody else touches `queryClient` for tasks.
 
 ```ts
+// use-tasks.tsx
+export function TasksProvider({ children }): JSX.Element;   // in (app)/layout.tsx: QueryClient + sync + storage
 export function useTasks(): { tasks: Task[]; isLoading: boolean; isError: boolean };   // queryKey ['tasks']
-
-export function useTaskActions(): {
-  create(draft: TaskDraft): void;          // optimistic with a temporary id; replaced on confirmation
-  update(id: string, patch: TaskPatch): void;
-  toggle(id: string): void;                // on completion shows toast "Done · Undo" (4 s)
-  remove(id: string): void;                // optimistic; real DELETE after 4 s unless "Undo"
+export function useTaskActions(): {                         // one stable object for the whole app
+  create(draft: TaskDraft): { id: string; saved: Promise<boolean> };  // optimistic, temporary id
+  update(id: string, patch: TaskPatch): void;               // refused locally if applyPatch refuses it
+  toggle(id: string): void;
+  duplicate(id: string): void;                              // copies steps under new ids
+  remove(id: string): void;                                 // optimistic; comes back if the server refuses
 };
+export function isUnsaved(task: Task): boolean;             // created here, not confirmed yet
+
+// task-sync.ts — framework-free core, tested with a fake adapter
+export type TasksAdapter = { list; create; update; remove };  // tasks-api.ts in the app
+export function createTaskSync(deps: { api: TasksAdapter; publish(tasks: Task[]): void }): TaskSync;
 ```
 
-Rules: `staleTime` 60 s; `onError` → rollback + `toast.error`; no `invalidateQueries` on every mutation (only after an error). `tasks-api.ts` is private to the module (not imported outside `client/`).
+Rules: the visible list is always the last server state with the pending writes replayed on top (built with `newTask` and `applyPatch`, so client and server agree). Writes to one task go out one at a time, so answers never overtake newer edits; writes made to a task still being created wait for its real id instead of being dropped. A list that left before a write was confirmed cannot undo it. A refused write drops that write and reloads the list; a refused create resolves `saved` to `false` and QuickAdd gives the text back. `staleTime` 5 min, no refetch on focus. The request starts when the provider is created, and the last confirmed list is painted from `localStorage` meanwhile. `tasks-api.ts` is private to the module (not imported outside `client/`). There are no toasts and no undo: the UI itself is the feedback.
+
+`use-now.ts` — `useNow(): { date, today, minute } | null`: one shared clock (one timer, aligned to the minute), `null` on the server and during hydration.
 
 ### 5.5 QuickAdd and the calendar
 
@@ -287,7 +308,7 @@ type QuickAddApi = {
 export function useQuickAdd(): QuickAddApi;
 ```
 
-`WeekCalendar` calls `setPendingRange` + `focus` on `select`. On Enter, `QuickAdd` does `create({ ...parsed, ...pendingRange })` (the range wins over a typed time), clears the range and calls `calendar.unselect()` via a registered callback. Esc clears range and text.
+`WeekCalendar` calls `setPendingRange` + `focus` on `select`. On Enter, `QuickAdd` creates `placeLine(text, today, where).draft` (the range wins over a typed time), clears the range, and the calendar unselects when `pending` becomes `null`. Esc clears range and text. `/today?line=…` (the landing's closing form) puts that line in the box, ready for Enter.
 
 ---
 
@@ -298,12 +319,12 @@ manage-my-tasks/
 ├── docs/ARCHITECTURE.md  docs/SPEC.md
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx                 # fonts, <html class="dark">, Providers, Toaster
+│   │   ├── layout.tsx                 # fonts, <html class="dark"> (server only: no providers)
 │   │   ├── globals.css                # tokens + base + motion utilities (section 8)
-│   │   ├── page.tsx                   # redirect("/today")
-│   │   ├── providers.tsx              # "use client": QueryClientProvider (+ devtools in dev)
+│   │   ├── page.tsx                   # the landing
 │   │   ├── (app)/
-│   │   │   ├── layout.tsx             # AppShell + QuickAddProvider + QuickAdd
+│   │   │   ├── layout.tsx             # TasksProvider + TooltipProvider + AppShell + QuickAdd
+│   │   │   ├── template.tsx           # view entrance
 │   │   │   ├── today/page.tsx
 │   │   │   ├── next/page.tsx
 │   │   │   ├── inbox/page.tsx
@@ -316,6 +337,8 @@ manage-my-tasks/
 │   │   │   ├── domain/
 │   │   │   │   ├── task.ts            task.test.ts
 │   │   │   │   ├── parse-line.ts      parse-line.test.ts
+│   │   │   │   ├── line.ts            line.test.ts       # The Line's policy
+│   │   │   │   ├── edit.ts            edit.test.ts       # the vocabulary of edits
 │   │   │   │   ├── spine.ts           spine.test.ts
 │   │   │   │   └── time.ts            time.test.ts
 │   │   │   ├── server/
@@ -324,8 +347,9 @@ manage-my-tasks/
 │   │   │   │   └── default-tasks.ts   # instance wired to session + memory store
 │   │   │   ├── client/
 │   │   │   │   ├── tasks-api.ts       # private
-│   │   │   │   ├── use-tasks.ts       # useTasks, useTaskActions
-│   │   │   │   └── use-now.ts         # current time without hydration mismatch
+│   │   │   │   ├── task-sync.ts       task-sync.test.ts  # framework-free optimistic core
+│   │   │   │   ├── use-tasks.tsx      # TasksProvider, useTasks, useTaskActions
+│   │   │   │   └── use-now.ts         # the shared clock, without hydration mismatch
 │   │   │   └── components/
 │   │   │       ├── app-shell.tsx      # header + LensTabs + container
 │   │   │       ├── day-header.tsx
@@ -334,14 +358,18 @@ manage-my-tasks/
 │   │   │       ├── task-detail.tsx    # sentence editing + steps + note
 │   │   │       ├── sentence-token.tsx # underlined token + Popover
 │   │   │       ├── quick-add.tsx      # QuickAdd + QuickAddProvider + useQuickAdd
+│   │   │       ├── task-editor.tsx    # the edit dialog + useTaskEditor
+│   │   │       ├── task-menu.tsx      # useTaskMenu: the actions of a task (row and block)
 │   │   │       └── day-aside.tsx      # Today's rhythm · Syntax
-│   │   └── calendar/
-│   │       ├── to-calendar-events.ts  to-calendar-events.test.ts
-│   │       └── week-calendar.tsx      # FullCalendar adapter ("use client"); styled with Tailwind classes
+│   │   ├── calendar/
+│   │   │   ├── to-calendar-events.ts  to-calendar-events.test.ts  # events, ranges, week totals
+│   │   │   ├── week-view.tsx          # lazy, client-only boundary
+│   │   │   └── week-calendar.tsx      # FullCalendar adapter ("use client"); styled with Tailwind classes
+│   │   └── landing/                   # static landing; reads the tasks domain, never the app
 │   ├── components/
 │   │   ├── ui/                        # shadcn (vendored; edit only variants/classes)
 │   │   └── ds/                        # design system primitives (section 9.1)
-│   │       ├── tick.tsx  chip.tsx  hold-button.tsx  duration-rule.tsx
+│   │       ├── tick.tsx  chip.tsx  delete-button.tsx  duration-rule.tsx  app-menu.tsx
 │   │       ├── priority-bars.tsx  now-marker.tsx  segment-meter.tsx  lens-tabs.tsx
 │   └── lib/
 │       ├── session.ts                 # getCurrentUserId(): Promise<string>  (server-only)
@@ -488,12 +516,12 @@ Rules: animate only `transform`, `opacity`, `filter`, `clip-path`, colours; neve
 |---|---|---|---|---|
 | `Tick` | `checked: boolean; onCheckedChange(v: boolean): void; label: string; disabled?: boolean` | idle, hover, pressed (scale .9), checked (moss + drawn check), disabled | the radix `Checkbox` primitive (shadcn's bakes in its own indicator) | Today |
 | `Chip` | `tone: "sodium" \| "neutral" \| "hint"; kind?: string; children` | enters with `animate-chip-in`; `hint` = dashed border | `span` | Today, QuickAdd |
-| `HoldButton` | `onConfirm(): void; label: string; holdMs?: number (700); children (icon)` | idle, holding (ember fill), cancelled (returns in 200 ms) | `button`; pointer **and** keyboard (hold Space/Enter) | Today, Motion |
+| `DeleteButton` | `onConfirm(): void; label: string` | idle, armed (second press confirms), disarms on leave | `button` | Today |
 | `DurationRule` | `minutes: number; label: string; done?: boolean; max?: number (120)` (the caller formats `label`, so `ds` never imports from `features`) | empty (0), partial, full; moss if `done` | `span` | Today |
 | `PriorityBars` | `priority: Priority` | 0–3 sodium bars; `aria-label` "Priority medium" | `span` | Today |
-| `NowMarker` | `label: string` | soft pulse; no pulse with reduced-motion | `div` | Today, Week |
+| `NowMarker` | `label: string` | soft ring (transform + opacity only); no ring with reduced-motion | `div` | Today, Week |
 | `SegmentMeter` | `segments: boolean[]; label: string` | moss segment = done | `div` | Today (header) |
-| `LensTabs` | `items: { href: string; label: string; count?: number; disabled?: boolean }[]; activeHref?: string` (defaults to `usePathname()`) | sliding indicator, 112 px per tab | `next/link` + `nav` | Today, Week |
+| `LensTabs` | `items: { href: string; label: string; count?: number; disabled?: boolean; onWarm?(): void }[]; activeHref?: string` (defaults to `usePathname()`) | sliding indicator, 112 px per tab; `onWarm` on hover/focus/touch | `next/link` + `nav` | Today, Week |
 
 shadcn components used (vendored, restyled only through tokens/variants): `button`, `input`, `checkbox`, `popover` (**add** with `npx shadcn@latest add popover`), `dropdown-menu`, `tooltip`, `sonner`, `separator`, `collapsible`. Popovers use `transform-origin: var(--radix-popover-content-transform-origin)`.
 
@@ -506,9 +534,9 @@ shadcn components used (vendored, restyled only through tokens/variants): `butto
 | `DaySpine` | List for the view with vertical spine, `NowMarker`, headings, empty state | `useTasks`, `buildSpine`, `TaskRow` | `lens` prop. Recomputes `nowMin` every 60 s. Empty state: "Nothing here." + help text. |
 | `TaskRow` | Time, node, `Tick`, title with animated strikethrough, tag, `DurationRule`, `PriorityBars`, `HoldButton` (visible on hover/focus) | `useTaskActions` | Click on the title opens `TaskDetail` inline (one open at a time). |
 | `TaskDetail` | Editable title, sentence with `SentenceToken`s, steps, note | `useTaskActions` | Saves on blur / Enter. Steps have their own "Add a step and press Enter" input. |
-| `SentenceToken` | Underlined token that opens a `Popover` to edit day, time, duration, priority, tag | `popover` | Duration: 15m/30m/45m/1h shortcuts + slider; shows "Ends HH:MM". |
+| `SentenceToken` | Underlined token that opens a `Popover` to edit day, time, duration, priority, tags | `popover`, `edit.ts` | Duration: the shared shortcuts + slider; shows "Ends HH:MM". The slider and the time input edit a local draft and save once (release, blur, Enter or close). |
 | `QuickAdd` | The **floating** Line: fixed, centred, `bottom: 120px` (mobile: `16px` + safe-area), max 680 px, `rounded-panel`, shadow | `parseLine`, `useTaskActions`, `useQuickAdd` | Enter creates; Esc clears. With no text it shows `hint` syntax chips. With a pending range it shows a sodium chip "Wed 22 · 15:30 → 17:00 · 1 h 30" and the placeholder "What will you do in this block?". With a missing time (no range and no time in Week) it shows help and does not create. |
-| `DayAside` | Today's rhythm (`hourLoad`), syntax table | `useTasks` | Stacks below the list under 900 px. |
+| `DayAside` | Today's rhythm (`hourPlan`), syntax table | `useTasks` | Stacks below the list under 900 px. |
 
 Content below `QuickAdd` has `padding-bottom: 280px` so the last row is not covered.
 
@@ -516,8 +544,9 @@ Content below `QuickAdd` has `padding-bottom: 280px` so the last row is not cove
 
 | File | Responsibility |
 |---|---|
-| `to-calendar-events.ts` | Pure data, no FullCalendar types. `toCalendarEvents(tasks): CalendarEvent[]` (only tasks with `date` and `startMin`; `start`/`end` as `"YYYY-MM-DDTHH:MM"` wall-clock strings, `end` = start + `max(durationMin, 15)`, rolling over midnight; `extendedProps: { tint, done }`; tint by tag: `study→ice`, `personal→moss`, `project→bone`, otherwise `neutral`) and `fromRange(start: Date, end: Date)`: `{ date, startMin, durationMin }` rounded to 5 min, a single 15 min slot becomes 60 min, never past midnight. |
-| `week-calendar.tsx` | The single FullCalendar adapter (section 10). Owns the week header (kicker with the ISO week, range title, planned time, ‹ Today ›). Exposes `<WeekCalendar />` with no FC props leaking out. |
+| `to-calendar-events.ts` | Pure data, no FullCalendar types. `toCalendarEvents(tasks): CalendarEvent[]` (only tasks with `date` and `startMin`; `start`/`end` as `"YYYY-MM-DDTHH:MM"` wall-clock strings, `end` = start + `max(durationMin, 15)`, rolling over midnight; `extendedProps: { tint, done }`; tint by tag: `study→ice`, `personal→moss`, `project→bone`, otherwise `neutral`) and `fromRange(start: Date, end: Date)`: `{ date, startMin, durationMin }` rounded to 5 min, never past midnight (moves and resizes); `fromSelection(start, end)`: the same, but a single 15 min click becomes 60 min (new blocks); `weekTotals(tasks, from, to)`: planned minutes for the week and per day, counting only the blocks the calendar draws. |
+| `week-calendar.tsx` | The single FullCalendar adapter (section 10). Owns the week header (kicker with the ISO week, range title, planned time, ‹ Today ›). Exposes `<WeekCalendar />` with no FC props leaking out. Every option it passes keeps its identity between renders (module-level constants, handlers through a ref): FullCalendar compares options by identity. |
+| `week-view.tsx` | `next/dynamic` with `ssr: false`: FullCalendar loads only on Week (warmed on tab hover/focus) and never renders on the server. |
 
 ---
 
@@ -558,10 +587,11 @@ import "@fullcalendar/react/skeleton.css";      // structure only; no theme
   selectable selectMirror unselectAuto={false}
   editable eventStartEditable eventDurationEditable
   events={toCalendarEvents(tasks)}
-  select={(info) => { setPendingRange(fromRange(info.start, info.end)); focus(); }}
+  select={(info) => { setPendingRange(fromSelection(info.start, info.end)); focus(); }}
   dateClick={(info) => api.select(info.date, info.date + 1 h)}   // a click creates a 1 h block
-  eventDrop={move} eventResize={move}      // update(id, fromRange(event.start, event.end))
-  eventClick={(info) => toggle(info.event.id)}
+  eventDrop={drop}                         // update(id, { date, startMin }): moving keeps the length
+  eventResize={resize}                     // update(id, fromRange(event.start, event.end))
+  eventClick={openTaskMenu}                // the block's actions; a click never completes the task
 />
 ```
 
@@ -574,7 +604,7 @@ The task-by-task detail is in **`docs/SPEC.md`**; the design system is built the
 ## 12. Definition of done (global)
 
 - Zero imports of `@clerk`, `supabase`, `animate-ui`, `CategoryProvider`, root `types.ts`.
-- No `fetch` to `/api/tasks` outside `features/tasks/client/tasks-api.ts`; no use of `queryClient` for tasks outside `use-tasks.ts`.
+- No `fetch` to `/api/tasks` outside `features/tasks/client/tasks-api.ts`; no use of `queryClient` for tasks outside `use-tasks.tsx`.
 - No FullCalendar type outside `features/calendar/`.
 - `domain/` has no React/Next imports (verifiable with grep).
 - `parseLine` tests cover every row of the grammar; `buildSpine` covers the three views and the marker; `tasks` covers validation, 404 by ownership and an invalid patch.
