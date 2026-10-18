@@ -6,6 +6,8 @@ import { useMemo } from "react";
 import { useAppMenu } from "@/components/ds/app-menu";
 import type { MenuItem } from "@/components/ds/app-menu";
 import { LensTabs } from "@/components/ds/lens-tabs";
+import { AccountButton } from "@/features/auth/components/account-button";
+import type { AccountUser } from "@/features/auth/components/account-button";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { lensCounts } from "@/features/tasks/domain/spine";
@@ -16,7 +18,7 @@ import { useQuickAdd } from "./quick-add";
 // once without every Today visit paying for FullCalendar.
 const warmWeek = () => import("@/features/calendar/week-calendar");
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ user, children }: { user: AccountUser; children: React.ReactNode }) {
   const router = useRouter();
   const now = useNow();
   const { tasks } = useTasks();
@@ -58,12 +60,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="animate-rise" style={{ animationDelay: "0ms" }}>
           <DayHeader />
         </div>
-        <div className="animate-rise" style={{ animationDelay: "70ms" }}>
-          <LensTabs items={tabs} />
+        <div className="flex animate-rise items-center justify-between gap-4" style={{ animationDelay: "70ms" }}>
+          {/* The tabs' underline runs up to the account button. */}
+          <div className="min-w-0 flex-1">
+            <LensTabs items={tabs} />
+          </div>
+          <AccountButton user={user} />
         </div>
-        <div className="animate-rise" style={{ animationDelay: "140ms" }}>
-          {children}
-        </div>
+        {/* The view's own entrance lives in (app)/template.tsx: one animation, not two. */}
+        {children}
       </div>
     </div>
   );

@@ -8,20 +8,9 @@ export interface TaskStore {
   remove(userId: string, id: string): Promise<boolean>;
 }
 
-// Data written before tags became a list (kept alive by hot reloads) has `tag`.
-function upgrade(task: Task): Task {
-  const old = task as Task & { tag?: string | null };
-  if (Array.isArray(old.tags)) return structuredClone(task);
-  const { tag, ...rest } = old;
-  return structuredClone({ ...rest, tags: tag ? [tag] : [] });
-}
-
 export type MemoryBacking = Map<string, Map<string, Task>>;
 
-/**
- * In-memory adapter. Pass a long-lived `backing` map to keep data across
- * module reloads (see default-tasks.ts); without one, each store is isolated.
- */
+/** In-memory adapter for tests: each store is isolated unless given a shared `backing` map. */
 export function createMemoryTaskStore(backing: MemoryBacking = new Map()): TaskStore {
   const forUser = (userId: string) => {
     let tasks = backing.get(userId);
@@ -36,11 +25,11 @@ export function createMemoryTaskStore(backing: MemoryBacking = new Map()): TaskS
     async list(userId) {
       return [...forUser(userId).values()]
         .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0))
-        .map(upgrade);
+        .map((task) => structuredClone(task));
     },
     async get(userId, id) {
       const task = forUser(userId).get(id);
-      return task ? upgrade(task) : null;
+      return task ? structuredClone(task) : null;
     },
     async put(userId, task) {
       forUser(userId).set(task.id, structuredClone(task));

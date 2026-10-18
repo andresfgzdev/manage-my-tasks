@@ -6,8 +6,8 @@ import { PanelNotes } from "./panel-notes";
 import { Views } from "./views";
 import "./landing.css";
 
-/** Where "Log in" goes. Repoint to /login once auth exists. */
-export const LOGIN_HREF = "/today";
+/** Where "Log in" goes. */
+export const LOGIN_HREF = "/login";
 /** Where the primary action opens the app. */
 export const APP_HREF = "/today";
 

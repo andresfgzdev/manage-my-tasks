@@ -4,23 +4,22 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Task } from "@/features/tasks/domain/task";
-import { tasksApi } from "./tasks-api";
+import { storageKey, tasksApi } from "./tasks-api";
 import { createTaskSync } from "./task-sync";
 import type { TaskSync } from "./task-sync";
 
-export { isUnsaved } from "./task-sync";
+export { clearTasksCache, endSession } from "./tasks-api";
 
 const KEY = ["tasks"] as const;
 const NO_TASKS: Task[] = [];
-const STORAGE_KEY = "better-tasks:tasks:v2";
 
 export type TaskActions = Pick<TaskSync, "create" | "update" | "toggle" | "duplicate" | "remove">;
 
 const TasksContext = createContext<TaskSync | null>(null);
 
-function readStorage(): Task[] | null {
+function readStorage(userId: string): Task[] | null {
   try {
-    const cached: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+    const cached: unknown = JSON.parse(localStorage.getItem(storageKey(userId)) ?? "null");
     // Older cached tasks have no `tags`: drop them rather than render a broken row.
     return Array.isArray(cached) && cached.every((t) => Array.isArray(t?.tags)) ? cached : null;
   } catch {
@@ -28,7 +27,7 @@ function readStorage(): Task[] | null {
   }
 }
 
-function setUp() {
+function setUp(userId: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { staleTime: 5 * 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
@@ -41,7 +40,7 @@ function setUp() {
   if (typeof window !== "undefined") {
     // The last known tasks paint at once, and the request starts now rather than
     // after the first render's effects.
-    const cached = readStorage();
+    const cached = readStorage(userId);
     if (cached) sync.seed(cached);
     queryClient.fetchQuery({ queryKey: KEY, queryFn: sync.load, staleTime: 0 }).catch(() => {});
   }
@@ -49,8 +48,8 @@ function setUp() {
 }
 
 /** Owns the tasks cache: React Query, the optimistic sync and the copy in localStorage. */
-export function TasksProvider({ children }: { children: React.ReactNode }) {
-  const [{ queryClient, sync }] = useState(setUp);
+export function TasksProvider({ userId, children }: { userId: string; children: React.ReactNode }) {
+  const [{ queryClient, sync }] = useState(() => setUp(userId));
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -60,7 +59,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       timer = setTimeout(() => {
         try {
           const confirmed = sync.confirmed();
-          if (confirmed) localStorage.setItem(STORAGE_KEY, JSON.stringify(confirmed));
+          if (confirmed) localStorage.setItem(storageKey(userId), JSON.stringify(confirmed));
         } catch {
           // Quota or privacy mode: the copy is optional.
         }
@@ -70,7 +69,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       unsubscribe();
     };
-  }, [queryClient, sync]);
+  }, [queryClient, sync, userId]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -8,7 +8,7 @@ import { DurationRule } from "@/components/ds/duration-rule";
 import { PriorityBars } from "@/components/ds/priority-bars";
 import { Tick } from "@/components/ds/tick";
 import { cn } from "@/lib/utils";
-import { isUnsaved, useTaskActions } from "@/features/tasks/client/use-tasks";
+import { useTaskActions } from "@/features/tasks/client/use-tasks";
 import { removeTimeMention, splitTimeMentions } from "@/features/tasks/domain/parse-line";
 import type { Task } from "@/features/tasks/domain/task";
 import { formatDuration, formatHM, formatRange } from "@/features/tasks/domain/time";
@@ -106,11 +106,9 @@ export const TaskRow = memo(function TaskRow({
   const editor = useTaskEditor();
   const [leaving, setLeaving] = useState(false);
 
-  // A row created moments ago gets the sodium wash. Measured once, at mount.
+  // A row created moments ago gets the sodium wash. Measured once, at mount: a row
+  // keeps its id from the optimistic copy on, so it mounts (and animates) once.
   const [fresh] = useState(() => Date.now() - Date.parse(task.createdAt) < FRESH_MS);
-  // A fresh row that already has its real id replaced the optimistic one a
-  // moment ago and was animated then: it must not fade in a second time.
-  const animateEntry = !fresh || isUnsaved(task);
 
   const onContextMenu = useContextMenuHandler(() =>
     taskMenu(task, () => onOpen(task.id)),
@@ -138,8 +136,8 @@ export const TaskRow = memo(function TaskRow({
     >
       <div className="min-h-0 overflow-hidden">
         <div
-          className={cn("group relative min-h-[60px] rounded-row", animateEntry && "animate-row-in")}
-          style={animateEntry ? { animationDelay: `${Math.min(index * 30, 240)}ms` } : undefined}
+          className="group relative min-h-[60px] animate-row-in rounded-row"
+          style={{ animationDelay: `${Math.min(index * 30, 240)}ms` }}
         >
           {fresh && (
             <span className="pointer-events-none absolute inset-0 animate-wash rounded-row bg-sodium" />

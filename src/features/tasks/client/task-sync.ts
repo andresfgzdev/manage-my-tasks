@@ -34,13 +34,6 @@ type Op =
   | { n: number; kind: "update"; id: string; patch: TaskPatch; at: string }
   | { n: number; kind: "remove"; id: string };
 
-const TEMP_PREFIX = "tmp-";
-
-/** True for a task the server has not confirmed yet. */
-export function isUnsaved(task: Pick<Task, "id">): boolean {
-  return task.id.startsWith(TEMP_PREFIX);
-}
-
 function upsert(list: Task[], task: Task): Task[] {
   return list.some((t) => t.id === task.id)
     ? list.map((t) => (t.id === task.id ? task : t))
@@ -79,9 +72,8 @@ export function createTaskSync(deps: {
   let ops: Op[] = [];
   let seq = 0;
 
-  // Temporary ids map to the real ones once created; writes made meanwhile follow them.
-  const realIds = new Map<string, string>();
-  const createdAs = new Map<string, string>();
+  // A new task carries its final id from the start (the server keeps it), so the
+  // optimistic copy and the saved one are the same row: nothing remounts.
   const chains = new Map<string, Promise<void>>();
 
   // Writes confirmed while a list request is in flight are newer than that list.
@@ -91,7 +83,6 @@ export function createTaskSync(deps: {
 
   const view = () => ops.reduce(apply, base ?? []);
   const publish = () => deps.publish(view());
-  const resolve = (id: string) => realIds.get(id) ?? id;
   const live = (n: number) => ops.find((o) => o.n === n);
   const drop = (n: number) => {
     ops = ops.filter((o) => o.n !== n);
@@ -106,11 +97,10 @@ export function createTaskSync(deps: {
   // Writes to one task run one after another: the server sees them in order and
   // their answers never overtake each other.
   function enqueue(id: string, step: () => Promise<void>) {
-    const key = createdAs.get(id) ?? id;
-    const next = (chains.get(key) ?? Promise.resolve()).then(step);
-    chains.set(key, next);
+    const next = (chains.get(id) ?? Promise.resolve()).then(step);
+    chains.set(id, next);
     void next.finally(() => {
-      if (chains.get(key) === next) chains.delete(key);
+      if (chains.get(id) === next) chains.delete(id);
     });
   }
 
@@ -135,16 +125,15 @@ export function createTaskSync(deps: {
   }
 
   function update(id: string, patch: TaskPatch) {
-    const target = resolve(id);
     const at = nowIso();
-    const current = view().find((t) => t.id === target);
+    const current = view().find((t) => t.id === id);
     // Nothing to edit, or an edit the server would refuse anyway.
     if (!current || !applyPatch(current, patch, at).ok) return;
 
     const n = ++seq;
-    ops.push({ n, kind: "update", id: target, patch, at });
+    ops.push({ n, kind: "update", id, patch, at });
     publish();
-    enqueue(target, async () => {
+    enqueue(id, async () => {
       const op = live(n);
       if (!op) return; // its task was never created
       try {
@@ -160,7 +149,7 @@ export function createTaskSync(deps: {
   }
 
   function create(draft: TaskDraft) {
-    const id = `${TEMP_PREFIX}${newId()}`;
+    const id = newId();
     const n = ++seq;
     ops.push({ n, kind: "create", id, draft, at: nowIso() });
     publish();
@@ -168,12 +157,9 @@ export function createTaskSync(deps: {
     const saved = new Promise<boolean>((done) => {
       enqueue(id, async () => {
         try {
-          const task = await api.create(draft);
-          realIds.set(id, task.id);
-          createdAs.set(task.id, id);
+          const task = await api.create({ ...draft, id });
           confirm(task.id, task);
           drop(n);
-          ops = ops.map((o) => (o.id === id ? { ...o, id: task.id } : o));
           done(true);
         } catch {
           ops = ops.filter((o) => o.id !== id);
@@ -200,12 +186,12 @@ export function createTaskSync(deps: {
     update,
 
     toggle(id) {
-      const task = view().find((t) => t.id === resolve(id));
+      const task = view().find((t) => t.id === id);
       if (task) update(id, { done: !task.done });
     },
 
     duplicate(id) {
-      const task = view().find((t) => t.id === resolve(id));
+      const task = view().find((t) => t.id === id);
       if (!task) return;
       const { title, date, startMin, durationMin, priority, tags, note, steps } = task;
       const copy = create({ title, date, startMin, durationMin, priority, tags: [...tags], note });
@@ -215,12 +201,11 @@ export function createTaskSync(deps: {
     },
 
     remove(id) {
-      const target = resolve(id);
-      if (!view().some((t) => t.id === target)) return;
+      if (!view().some((t) => t.id === id)) return;
       const n = ++seq;
-      ops.push({ n, kind: "remove", id: target });
+      ops.push({ n, kind: "remove", id });
       publish();
-      enqueue(target, async () => {
+      enqueue(id, async () => {
         const op = live(n);
         if (!op) return;
         try {

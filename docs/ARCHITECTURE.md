@@ -49,10 +49,11 @@ Analysis with `tidy-tree` (discover + inventory, read-only) and the *improve-cod
 - **Open task** inline, with sentence editing, steps and a note.
 - Complete with a tick; delete with a two-step delete button (no undo: the UI is the feedback).
 - Design system (tokens + primitives) and the component suite from sections 8–9.
-- **In-memory** persistence behind `TaskStore`.
+- **MongoDB** persistence behind `TaskStore` (V1.1; the memory adapter remains for tests).
+- **Accounts** with Better Auth, Google sign-in only (V1.1, D20).
 
 ### 2.2 Out (do not implement)
-Real authentication · database · task sharing and any people/shared UI (not even as a teaser) · time zones · recurring tasks · notifications · dragging from Inbox to the calendar · calendar month/day views · swipe gestures on mobile · global keyboard shortcuts · light mode · i18n (the UI is English only for now) · UI/e2e tests · the "V1.1" improvements discussed earlier (free gaps, re-allocating sodium, etc.).
+Task sharing and any people/shared UI (not even as a teaser) · time zones · recurring tasks · notifications · dragging from Inbox to the calendar · calendar month/day views · swipe gestures on mobile · global keyboard shortcuts · light mode · i18n (the UI is English only for now) · UI/e2e tests · the "V1.1" improvements discussed earlier (free gaps, re-allocating sodium, etc.).
 
 ---
 
@@ -90,6 +91,17 @@ Real authentication · database · task sharing and any people/shared UI (not ev
 | D10 | **Dark mode only.** `<html class="dark">` fixed, no toggle; the light theme block is removed. | Design requirement. | Theming with `next-themes` (the package is kept only because `components/ui/sonner.tsx` imports it; set `theme="dark"`). |
 | D11 | **The view is the route**: `/today`, `/next`, `/inbox`, `/week`. | Shareable URL, back button, no global category context. | State in context (`CategoryProvider`, removed). |
 | D12 | **Fonts:** DM Sans (primary, variable `wght` + `opsz`) and JetBrains Mono (times, durations, metadata), via `next/font/google`. | Requirement. Both verified in `next/font` 16.4 as variable fonts. | The canvas fonts (Schibsted Grotesk / Spline Sans Mono) are replaced. |
+| D13 | **MongoDB with the official `mongodb` driver** (V1.1), one `tasks` collection; a task is one document (`_id` = task id, `userId` a field), its shape guarded by a `$jsonSchema` validator (`taskValidator`). | The `Task` aggregate is already a document; the domain keeps the rules, the validator only the shape. | Mongoose (a second validation layer); Postgres + Drizzle. |
+| D19 | **`npm run db:setup`** (`scripts/db-setup.mts`) applies the tasks validator and indexes and the indexes Better Auth declares but does not create on MongoDB (unique email and session token, `userId` lookups, TTL on expired sessions). Idempotent. | Without them MongoDB accepts duplicate emails. | Creating them at request time (needs admin rights). |
+| D14 | **Better Auth** (V1.1) with its MongoDB adapter in the same database. **Google is the only way in** (D20); database sessions of 7 days, extended at most once a day while used; rate limit counters in the database. | Self-hosted, one database; per-instance memory would not rate-limit anything on serverless. | Clerk (vendor lock-in); Auth.js. |
+| D15 | **`getCurrentUserId()` returns `string \| null`**; the tasks module answers `unauthorized` (HTTP 401) before anything else. | D6 stays the only identity seam. | Session reads in each route handler. |
+| D16 | **`src/proxy.ts` is only a fast first filter**: on the app routes, no session cookie → `/login?next=…`. It does not touch `/login` (a stale cookie bounced back to the app would loop) nor prefetches (matcher `missing: next-router-prefetch`, Next's documented pattern). | Next 16: Proxy runs on every matched request and is not an authorization layer. | Session lookups in Proxy; redirecting `/login` by cookie. |
+| D17 | **The memory adapter is for tests only**; the app always uses MongoDB, and every adapter passes `task-store-contract.ts`. | One production path; fast database-free tests. | A memory fallback without `MONGODB_URI` (silently loses data). |
+| D18 | **No transactions in the auth adapter** (it gets the `Db`, not the client). | A standalone local `mongod` works as well as Atlas. | Passing `client` (needs a replica set). |
+| D20 | **Google-only sign-in** with `prompt: "select_account"`; the same button signs up and logs in. `callbackURL` and `errorCallbackURL` are validated by Better Auth against the app's origin; `?next=` goes through `safeNext` (same-site paths only). | No passwords to store, reset or verify; the chooser keeps a shared browser from signing in the wrong person. | Email + password (V1.1 first cut); GitHub. |
+| D21 | **The session is verified before the app renders**: `(app)/layout.tsx` calls `getCurrentUser()` (a database check, cached per request) and redirects to `/login?reason=expired`; `/login` does the same check and sends a signed-in visitor on. While the app is open, `SessionGuard` re-checks when the tab returns and every 5 minutes, and a 401 from the API does the same: forget the local copies and go to `/login?reason=expired&next=…`. | A revoked or expired session never paints the app or its cached tasks. Layouts do not re-run on client navigation, so the API's 401 and the guard cover the rest. | Cookie-only checks; `return null` in the layout. |
+| D22 | **Hardened API and responses**: writes must come from this site (`Sec-Fetch-Site: same-origin`, or else an `Origin` whose host is the request's `Host`; never `req.url`, whose host behind a proxy is not the browser's), be `application/json` and at most 64 KB (`server/http.ts`); task responses are `Cache-Control: private, no-store`; every response carries `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `strict-origin-when-cross-origin` and HSTS. The local task copy is per account (`better-tasks:tasks:v3:<userId>`), and sign out or an ended session removes every copy. | CSRF in depth on top of SameSite cookies; no clickjacking; no task data left in shared caches or on a shared device. | A full CSP (Next's inline scripts need nonces; not worth it yet). |
+| D23 | **The client names new tasks** (a UUID in the draft; the server keeps it, and a retried create returns the existing task). The optimistic copy and the saved task are the same row, so nothing remounts or re-animates when the server answers; `task-sync` no longer maps temporary ids. | Removes the flicker of a row (and of a Week block) being replaced, and a whole layer of id translation. | Temporary ids swapped for server ids. |
 
 ---
 
@@ -112,14 +124,14 @@ Real authentication · database · task sharing and any people/shared UI (not ev
           │ features/tasks/    │  │ features/tasks/domain  │◄──────────┘            │
           │ client (deep)      │  │ parseLine · buildSpine │              ┌─────────▼────────┐
           │ useTasks           │  │ validate · time        │              │ TaskStore        │
-          │ useTaskActions     │  └────────────────────────┘              │ memory adapter   │
+          │ useTaskActions     │  └────────────────────────┘              │ Mongo · memory   │
           └──────────┬─────────┘                                          └──────────────────┘
-                     │ fetch /api/tasks                    lib/session.ts → getCurrentUserId()
+                     │ fetch /api/tasks     lib/session.ts → getCurrentUserId() → lib/auth.ts (Better Auth) → lib/mongo.ts
                      ▼
           components/ds (primitives)  ·  components/ui (vendored shadcn)
 ```
 
-**Dependency direction (rule):** `app → features → components/ds → components/ui → lib`. `features/*/domain` imports no React, no Next, nothing outside itself. `features/calendar` may import `features/tasks/domain`, `features/tasks/client` and the three task entry points every view shares: `useQuickAdd`, `useTaskEditor` and `useTaskMenu`; never the reverse. `features/landing` may import `features/tasks/domain` and the clock (`client/use-now.ts`), nothing else. `components/ds` does not import from `features`.
+**Dependency direction (rule):** `app → features → components/ds → components/ui → lib`. `features/*/domain` imports no React, no Next, nothing outside itself. `features/calendar` may import `features/tasks/domain`, `features/tasks/client` and the three task entry points every view shares: `useQuickAdd`, `useTaskEditor` and `useTaskMenu`; never the reverse. `features/landing` may import `features/tasks/domain` and the clock (`client/use-now.ts`), nothing else. `features/auth` imports `lib/auth-client`, `components/*` and `clearTasksCache`/`endSession` from `features/tasks/client/use-tasks`; `AppShell` may import `AccountButton`. Only `lib/mongo.ts` and `server/mongo-task-store*` import `mongodb`; only `lib/auth*`, `app/api/auth`, `proxy.ts` and `features/auth` import Better Auth. `components/ds` does not import from `features`.
 
 ### 5.2 Domain module — `src/features/tasks/domain/`
 
@@ -258,16 +270,16 @@ export function createTasksModule(deps: {
 export const tasks: TasksModule;   // memory store + getCurrentUserId + Date + crypto.randomUUID
 ```
 
-Errors: validation → `{ ok:false, error }` (HTTP 400); another user's task or a missing one → `"not_found"` (HTTP 404). `tasks.ts` and `task-store.ts` do not import `server-only` (so they run under `node --test`); `default-tasks.ts` imports `src/lib/session.ts`, which does.
+Errors: validation → `{ ok:false, error }` (HTTP 400); another user's task or a missing one → `"not_found"` (HTTP 404); nobody signed in → `"unauthorized"` (HTTP 401), checked before anything else. `tasks.ts` and `task-store.ts` do not import `server-only` (so they run under `node --test`); `default-tasks.ts` imports `src/lib/session.ts`, which does.
 
 **HTTP contract** (`src/app/api/tasks/…`):
 
 | Method | Route | Body | Response |
 |---|---|---|---|
-| GET | `/api/tasks` | — | `200 Task[]` |
-| POST | `/api/tasks` | `TaskDraft` | `201 Task` · `400 {error}` |
-| PATCH | `/api/tasks/[id]` | `TaskPatch` | `200 Task` · `400` · `404` |
-| DELETE | `/api/tasks/[id]` | — | `204` · `404` |
+| GET | `/api/tasks` | — | `200 Task[]` · `401` |
+| POST | `/api/tasks` | `TaskDraft` | `201 Task` · `400 {error}` · `401` |
+| PATCH | `/api/tasks/[id]` | `TaskPatch` | `200 Task` · `400` · `404` · `401` |
+| DELETE | `/api/tasks/[id]` | — | `204` · `404` · `401` |
 
 ### 5.4 Client module — `src/features/tasks/client/`
 
@@ -316,8 +328,9 @@ export function useQuickAdd(): QuickAddApi;
 
 ```
 manage-my-tasks/
-├── docs/ARCHITECTURE.md  docs/SPEC.md
+├── docs/ARCHITECTURE.md  docs/SPEC.md  docs/SPEC-V1.1.md
 ├── src/
+│   ├── proxy.ts                       # first filter from the session cookie (D16)
 │   ├── app/
 │   │   ├── layout.tsx                 # fonts, <html class="dark"> (server only: no providers)
 │   │   ├── globals.css                # tokens + base + motion utilities (section 8)
@@ -329,9 +342,12 @@ manage-my-tasks/
 │   │   │   ├── next/page.tsx
 │   │   │   ├── inbox/page.tsx
 │   │   │   └── week/page.tsx
-│   │   └── api/tasks/
-│   │       ├── route.ts               # GET, POST
-│   │       └── [id]/route.ts          # PATCH, DELETE
+│   │   ├── login/page.tsx             # Continue with Google; real session check
+│   │   └── api/
+│   │       ├── auth/[...all]/route.ts # Better Auth
+│   │       └── tasks/
+│   │           ├── route.ts           # GET, POST
+│   │           └── [id]/route.ts      # PATCH, DELETE
 │   ├── features/
 │   │   ├── tasks/
 │   │   │   ├── domain/
@@ -342,9 +358,12 @@ manage-my-tasks/
 │   │   │   │   ├── spine.ts           spine.test.ts
 │   │   │   │   └── time.ts            time.test.ts
 │   │   │   ├── server/
-│   │   │   │   ├── task-store.ts
+│   │   │   │   ├── task-store.ts      task-store.test.ts # interface + memory adapter (tests)
+│   │   │   │   ├── task-store-contract.ts                # cases every adapter passes
+│   │   │   │   ├── mongo-task-store.ts  mongo-task-store.test.ts
 │   │   │   │   ├── tasks.ts           tasks.test.ts
-│   │   │   │   └── default-tasks.ts   # instance wired to session + memory store
+│   │   │   │   ├── http.ts            http.test.ts       # write guards, status codes (D22)
+│   │   │   │   └── default-tasks.ts   # instance wired to session + Mongo store
 │   │   │   ├── client/
 │   │   │   │   ├── tasks-api.ts       # private
 │   │   │   │   ├── task-sync.ts       task-sync.test.ts  # framework-free optimistic core
@@ -365,6 +384,9 @@ manage-my-tasks/
 │   │   │   ├── to-calendar-events.ts  to-calendar-events.test.ts  # events, ranges, week totals
 │   │   │   ├── week-view.tsx          # lazy, client-only boundary
 │   │   │   └── week-calendar.tsx      # FullCalendar adapter ("use client"); styled with Tailwind classes
+│   │   ├── auth/
+│   │   │   ├── safe-next.ts           safe-next.test.ts  # ?next= → same-site path
+│   │   │   └── components/            # login-form.tsx, account-button.tsx, session-guard.tsx
 │   │   └── landing/                   # static landing; reads the tasks domain, never the app
 │   ├── components/
 │   │   ├── ui/                        # shadcn (vendored; edit only variants/classes)
@@ -372,8 +394,12 @@ manage-my-tasks/
 │   │       ├── tick.tsx  chip.tsx  delete-button.tsx  duration-rule.tsx  app-menu.tsx
 │   │       ├── priority-bars.tsx  now-marker.tsx  segment-meter.tsx  lens-tabs.tsx
 │   └── lib/
-│       ├── session.ts                 # getCurrentUserId(): Promise<string>  (server-only)
+│       ├── session.ts                 # getCurrentUser() / getCurrentUserId(), checked in the database (server-only)
+│       ├── auth.ts                    # Better Auth instance (server-only)
+│       ├── auth-client.ts             # Better Auth React client
+│       ├── mongo.ts                   # cached MongoClient, getDb() (server-only)
 │       └── utils.ts                   # cn()
+├── scripts/db-setup.mts               # npm run db:setup (D19)
 ├── components.json  tsconfig.json  eslint.config.mjs  next.config.ts  package.json  .npmrc
 ```
 
@@ -407,7 +433,7 @@ Configuration changes: `tsconfig.json` → `"paths": { "@/*": ["./src/*"] }` and
 
 ## 7. Sample data
 
-The in-memory store starts **empty** (the empty state is designed). Tests use their own fixtures. No seed is added.
+A new account starts **empty** (the empty state is designed). Tests use their own fixtures. No seed is added.
 
 ---
 
@@ -632,7 +658,8 @@ The task-by-task detail is in **`docs/SPEC.md`**; the design system is built the
 |---|---|
 | FullCalendar 7.1.3 was published on 2026-10-16 (very recent). | Pin the exact version; if a blocking bug appears, go down to 7.1.2 (2026-10-12), never to v6. |
 | Styling FC without a theme means every visible part must be given classes. | All of it lives in `week-calendar.tsx`, through the documented `*Class` options (a stable API, unlike the obfuscated internals). |
-| The in-memory store is lost on restart. | Expected (2.2). The `TaskStore` seam is where the DB plugs in. |
+| Better Auth 1.7.10 was published on 2026-10-15, three days before pinning. | Exact version; if a blocking bug appears, go down a patch (1.7.9, 1.7.8), never to 1.6. |
+| `npm run build` imports the route modules, so it needs `MONGODB_URI`. | `.env.local` locally; the Vercel project's variables in production. |
 | `node --test` requires `.ts` in relative imports of `domain/`. | `allowImportingTsExtensions` in tsconfig; rule in section 6. |
 
 Questions before the spec: none blocking. If a demo seed is wanted in development, decide it in the spec (default: no).
