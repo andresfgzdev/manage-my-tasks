@@ -1,27 +1,52 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
+import { minuteOfDay, toIsoDate } from "@/features/tasks/domain/time";
+
+export type Now = {
+  date: Date;
+  /** Local "YYYY-MM-DD". */
+  today: string;
+  /** Minutes past local midnight. */
+  minute: number;
+};
+
+// One clock for the whole page: a single timer on the minute boundary, and the
+// same snapshot object for every reader during a minute.
+const MINUTE = 60_000;
+const listeners = new Set<() => void>();
+let timer: ReturnType<typeof setTimeout> | undefined;
+let snapshot: Now | null = null;
+
+function read(): Now {
+  const ms = Math.floor(Date.now() / MINUTE) * MINUTE;
+  if (snapshot?.date.getTime() !== ms) {
+    const date = new Date(ms);
+    snapshot = { date, today: toIsoDate(date), minute: minuteOfDay(date) };
+  }
+  return snapshot;
+}
+
+function tick() {
+  timer = setTimeout(() => {
+    for (const listener of listeners) listener();
+    tick();
+  }, MINUTE - (Date.now() % MINUTE));
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  if (listeners.size === 1) tick();
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) clearTimeout(timer);
+  };
+}
 
 /**
- * Current time, refreshed on every `intervalMs` boundary (the minute by default).
- * Returns `null` on the server and during hydration, so components that depend
- * on the time render a skeleton first and never mismatch.
+ * The current minute. `null` on the server and during hydration, so components
+ * that depend on the time render a placeholder first and never mismatch.
  */
-export function useNow(intervalMs = 60_000): Date | null {
-  const ms = useSyncExternalStore<number | null>(
-    (onChange) => {
-      let timer: ReturnType<typeof setTimeout>;
-      const schedule = () => {
-        timer = setTimeout(() => {
-          onChange();
-          schedule();
-        }, intervalMs - (Date.now() % intervalMs));
-      };
-      schedule();
-      return () => clearTimeout(timer);
-    },
-    () => Math.floor(Date.now() / intervalMs) * intervalMs,
-    () => null,
-  );
-  return useMemo(() => (ms === null ? null : new Date(ms)), [ms]);
+export function useNow(): Now | null {
+  return useSyncExternalStore(subscribe, read, () => null);
 }

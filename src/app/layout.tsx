@@ -3,7 +3,6 @@ import "./globals.css";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import type { Metadata } from "next";
-import { Providers } from "./providers";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -12,10 +11,12 @@ const dmSans = DM_Sans({
   display: "swap",
 });
 
+// Only the app uses the mono face: the landing must not wait for it.
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -32,9 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
       {/* Browser extensions inject attributes into <body> before hydration. */}
-      <body suppressHydrationWarning>
-        <Providers>{children}</Providers>
-      </body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

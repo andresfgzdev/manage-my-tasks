@@ -1,8 +1,8 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { InboxView, NextView, TodayView, WeekView } from "./fragments";
-import { useNow } from "./use-now";
+import { useNow } from "@/features/tasks/client/use-now";
+import { FALLBACK_NOW, InboxView, NextView, TodayView, WeekView } from "./fragments";
 
 const VIEWS = [
   { id: "today", name: "Today", text: "Your hours from top to bottom, with a marker at the current minute. What is done or past steps back." },
@@ -16,7 +16,7 @@ type ViewId = (typeof VIEWS)[number]["id"];
 export function Views() {
   const [state, setState] = useState<{ view: ViewId; dir: "next" | "prev" }>({ view: "today", dir: "next" });
   const { view, dir } = state;
-  const now = useNow();
+  const nowMin = useNow()?.minute ?? FALLBACK_NOW.minute;
   const index = VIEWS.findIndex((v) => v.id === view);
   const current = VIEWS[index];
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -67,7 +67,7 @@ export function Views() {
       </div>
       <div className="bt-views__stage" data-reveal id="view-stage" role="tabpanel" aria-label={current.name}>
         <div key={view} className="bt-views__sheet" data-view={view} data-dir={dir}>
-          {view === "today" && <TodayView nowMin={now.min} />}
+          {view === "today" && <TodayView nowMin={nowMin} />}
           {view === "next" && <NextView />}
           {view === "inbox" && <InboxView />}
           {view === "week" && <WeekView />}

@@ -2,18 +2,18 @@
 
 import { CalendarDays, Inbox, Plus, Sun, SunMedium } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useAppMenu } from "@/components/ds/app-menu";
 import type { MenuItem } from "@/components/ds/app-menu";
 import { LensTabs } from "@/components/ds/lens-tabs";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { lensCounts } from "@/features/tasks/domain/spine";
-import { toIsoDate } from "@/features/tasks/domain/time";
 import { DayHeader } from "./day-header";
 import { useQuickAdd } from "./quick-add";
 
-// Warms the calendar chunk while the browser is idle, so opening Week is instant.
+// Warms the calendar chunk when the Week tab is hovered or focused, so it opens at
+// once without every Today visit paying for FullCalendar.
 const warmWeek = () => import("@/features/calendar/week-calendar");
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -22,17 +22,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { tasks } = useTasks();
   const menu = useAppMenu();
   const { focus } = useQuickAdd();
-  const today = now ? toIsoDate(now) : null;
+  const today = now?.today ?? null;
   const counts = useMemo(() => (today ? lensCounts(tasks, today) : null), [tasks, today]);
-
-  useEffect(() => {
-    const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
-      .requestIdleCallback;
-    const handle = idle ? idle(warmWeek) : window.setTimeout(warmWeek, 1500);
-    return () => {
-      if (!idle) clearTimeout(handle);
-    };
-  }, []);
 
   const tabs = useMemo(
     () => [

@@ -6,7 +6,6 @@ import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { buildSpine } from "@/features/tasks/domain/spine";
 import type { Lens } from "@/features/tasks/domain/spine";
-import { toIsoDate } from "@/features/tasks/domain/time";
 import { TaskRow } from "./task-row";
 
 export function DaySpine({ lens }: { lens: Lens }) {
@@ -16,8 +15,8 @@ export function DaySpine({ lens }: { lens: Lens }) {
 
   const open = useCallback((id: string) => setOpenId(id), []);
   const close = useCallback(() => setOpenId(null), []);
-  const todayIso = now ? toIsoDate(now) : null;
-  const nowMin = now ? now.getHours() * 60 + now.getMinutes() : 0;
+  const todayIso = now?.today ?? null;
+  const nowMin = now?.minute ?? 0;
   const items = useMemo(
     () => (todayIso ? buildSpine(tasks, lens, todayIso, nowMin) : []),
     [tasks, lens, todayIso, nowMin],

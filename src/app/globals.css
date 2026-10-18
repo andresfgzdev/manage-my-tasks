@@ -84,12 +84,12 @@
 }
 
 @keyframes row-in {
-  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes chip-in {
-  from { opacity: 0; transform: translateY(2px) scale(0.95); filter: blur(2px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(2px) scale(0.95); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes wash {
   from { opacity: 0.16; }
@@ -119,9 +119,10 @@
   0%, 100% { opacity: 0.45; }
   50% { opacity: 0.9; }
 }
-@keyframes now-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-sodium) 35%, transparent); }
-  50% { box-shadow: 0 0 0 6px transparent; }
+/* A ring that grows and fades: transform and opacity only, so it never repaints the page. */
+@keyframes now-ring {
+  0% { transform: scale(1); opacity: 0.35; }
+  70%, 100% { transform: scale(2.4); opacity: 0; }
 }
 
 @utility press {

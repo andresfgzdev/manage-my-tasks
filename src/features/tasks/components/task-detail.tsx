@@ -7,8 +7,10 @@ import { Tick } from "@/components/ds/tick";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTaskActions } from "@/features/tasks/client/use-tasks";
-import type { Task } from "@/features/tasks/domain/task";
-import { addDays, dayTitle, formatDuration, formatHM, toIsoDate } from "@/features/tasks/domain/time";
+import { addStep, formatTags, setDay, setTime, toggleStep } from "@/features/tasks/domain/edit";
+import { PRIORITY_NAMES } from "@/features/tasks/domain/task";
+import type { Task, TaskPatch } from "@/features/tasks/domain/task";
+import { formatDuration, formatHM, relativeDay, toIsoDate } from "@/features/tasks/domain/time";
 import {
   DayEditor,
   DurationEditor,
@@ -18,20 +20,10 @@ import {
   TimeEditor,
 } from "./sentence-token";
 
-const PRIORITY_WORDS = ["no", "low", "medium", "high"];
-
-function dayLabel(date: string | null, today: string): string {
-  if (date === null) return "no date";
-  if (date === today) return "today";
-  if (date === addDays(today, 1)) return "tomorrow";
-  const [y, m, d] = date.split("-").map(Number);
-  return dayTitle(new Date(y, m - 1, d)).num;
-}
-
 export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
   const actions = useTaskActions();
   const now = useNow();
-  const today = toIsoDate(now ?? new Date());
+  const today = now?.today ?? toIsoDate(new Date());
 
   const [title, setTitle] = useState(task.title);
   const [note, setNote] = useState(task.note);
@@ -39,17 +31,23 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
 
   const doneSteps = task.steps.filter((s) => s.done).length;
 
-  const commitTitle = () => {
+  // What the title and note fields would change, so closing sends both in one write.
+  const textPatch = (): TaskPatch => {
     const clean = title.trim();
-    if (clean === "") setTitle(task.title);
-    else if (clean !== task.title) actions.update(task.id, { title: clean });
+    return {
+      ...(clean !== "" && clean !== task.title && { title: clean }),
+      ...(note !== task.note && { note }),
+    };
   };
-  const commitNote = () => {
-    if (note !== task.note) actions.update(task.id, { note });
+  const commit = (patch: TaskPatch) => {
+    if (Object.keys(patch).length > 0) actions.update(task.id, patch);
+  };
+  const commitTitle = () => {
+    if (title.trim() === "") setTitle(task.title);
+    else commit(textPatch().title ? { title: title.trim() } : {});
   };
   const close = () => {
-    commitTitle();
-    commitNote();
+    commit(textPatch());
     onClose();
   };
 
@@ -88,15 +86,13 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
 
           <p className="max-w-[860px] text-[19px] leading-[1.9] text-ash">
             Do it{" "}
-            <SentenceToken label={dayLabel(task.date, today)}>
+            <SentenceToken label={relativeDay(task.date, today)}>
               {(closePopover) => (
                 <DayEditor
                   date={task.date}
                   today={today}
                   close={closePopover}
-                  onChange={(date) =>
-                    actions.update(task.id, date === null ? { date, startMin: null } : { date })
-                  }
+                  onChange={(date) => actions.update(task.id, setDay(date))}
                 />
               )}
             </SentenceToken>{" "}
@@ -104,14 +100,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
             <SentenceToken label={task.startMin === null ? "add time" : formatHM(task.startMin)}>
               <TimeEditor
                 startMin={task.startMin}
-                onChange={(startMin) =>
-                  actions.update(
-                    task.id,
-                    startMin !== null && task.date === null
-                      ? { startMin, date: today }
-                      : { startMin },
-                  )
-                }
+                onChange={(startMin) => actions.update(task.id, setTime(task, startMin, today))}
               />
             </SentenceToken>
             , for{" "}
@@ -123,7 +112,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
               />
             </SentenceToken>
             , with{" "}
-            <SentenceToken label={PRIORITY_WORDS[task.priority]}>
+            <SentenceToken label={task.priority === 0 ? "no" : PRIORITY_NAMES[task.priority]}>
               {(closePopover) => (
                 <PriorityEditor
                   priority={task.priority}
@@ -133,7 +122,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
               )}
             </SentenceToken>{" "}
             priority, tagged{" "}
-            <SentenceToken label={task.tags.length ? task.tags.map((t) => `#${t}`).join(" ") : "add tags"}>
+            <SentenceToken label={task.tags.length ? formatTags(task.tags).replaceAll(",", "") : "add tags"}>
               {(closePopover) => (
                 <TagEditor
                   tags={task.tags}
@@ -178,11 +167,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
                 className="size-[18px]"
                 checked={step.done}
                 label={step.done ? "Mark step as pending" : "Complete step"}
-                onCheckedChange={() =>
-                  actions.update(task.id, {
-                    steps: task.steps.map((s) => (s.id === step.id ? { ...s, done: !s.done } : s)),
-                  })
-                }
+                onCheckedChange={() => actions.update(task.id, toggleStep(task, step.id))}
               />
               <span className={cn("text-[15px]", step.done && "text-ash line-through")}>
                 {step.title}
@@ -200,11 +185,10 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
               value={newStep}
               onChange={(e) => setNewStep(e.target.value)}
               onKeyDown={(e) => {
-                const clean = newStep.trim();
-                if (e.key !== "Enter" || clean === "" || e.nativeEvent.isComposing) return;
-                actions.update(task.id, {
-                  steps: [...task.steps, { id: crypto.randomUUID(), title: clean, done: false }],
-                });
+                if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                const patch = addStep(task, newStep, crypto.randomUUID());
+                if (!patch) return;
+                actions.update(task.id, patch);
                 setNewStep("");
               }}
               className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-ash-dim"
@@ -220,7 +204,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
             placeholder="Notes"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            onBlur={commitNote}
+            onBlur={() => commit(note !== task.note ? { note } : {})}
             className="resize-none rounded-row border border-line bg-ground px-3.5 py-3 text-sm leading-[1.55] outline-none transition-colors placeholder:text-ash-dim focus-visible:border-sodium/40"
           />
         </section>

@@ -119,7 +119,7 @@ export function Landing() {
             <button type="submit" className="bt-btn">Open today</button>
           </form>
           <p className="bt-close__note">
-            Opens your Today view. The same line box waits at the top, and it reads lines the same way.
+            Opens your Today view with this line waiting in the Line. Press Enter there to add it.
           </p>
         </section>
       </main>

@@ -6,10 +6,11 @@ import { createContext, useContext, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/features/tasks/client/use-now";
 import { useTaskActions, useTasks } from "@/features/tasks/client/use-tasks";
+import { DURATION_SHORTCUTS, PRIORITY_CHOICES, editAll, formatTags } from "@/features/tasks/domain/edit";
 import type { Priority, Task } from "@/features/tasks/domain/task";
-import { formatHM } from "@/features/tasks/domain/time";
-import { parseTags } from "./tag-input";
+import { formatHM, toIsoDate } from "@/features/tasks/domain/time";
 
 const TaskEditorContext = createContext<{ edit(id: string): void } | null>(null);
 
@@ -44,13 +45,6 @@ export function TaskEditorProvider({ children }: { children: React.ReactNode }) 
   );
 }
 
-const PRIORITIES: { value: Priority; label: string }[] = [
-  { value: 0, label: "None" },
-  { value: 1, label: "Low" },
-  { value: 2, label: "Medium" },
-  { value: 3, label: "High" },
-];
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
@@ -62,28 +56,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function EditForm({ task, onDone }: { task: Task; onDone(): void }) {
   const actions = useTaskActions();
+  const now = useNow();
   const [title, setTitle] = useState(task.title);
   const [date, setDate] = useState(task.date ?? "");
   const [time, setTime] = useState(task.startMin === null ? "" : formatHM(task.startMin));
   const [duration, setDuration] = useState(task.durationMin ? String(task.durationMin) : "");
   const [priority, setPriority] = useState<Priority>(task.priority);
-  const [tags, setTags] = useState(task.tags.map((t) => `#${t}`).join(", "));
+  const [tags, setTags] = useState(formatTags(task.tags));
 
-  const needsDate = time !== "" && date === "";
-  const canSave = title.trim() !== "" && !needsDate;
+  const goesToday = time !== "" && date === "";
+  const canSave = title.trim() !== "";
 
   const save = () => {
-    if (!canSave) return;
-    const [h, m] = time.split(":").map(Number);
-    const minutes = Math.round(Number(duration));
-    actions.update(task.id, {
-      title: title.trim(),
-      date: date || null,
-      startMin: time && date ? h * 60 + m : null,
-      durationMin: Number.isFinite(minutes) ? Math.min(Math.max(minutes, 0), 1440) : 0,
-      priority,
-      tags: parseTags(tags),
-    });
+    const patch = editAll(
+      { title, date, time, duration, priority, tags },
+      now?.today ?? toIsoDate(new Date()),
+    );
+    if (!patch.ok) return;
+    actions.update(task.id, patch.value);
     onDone();
   };
 
@@ -117,9 +107,9 @@ function EditForm({ task, onDone }: { task: Task; onDone(): void }) {
           <Input type="time" step={300} value={time} onChange={(e) => setTime(e.target.value)} />
         </Field>
       </div>
-      {needsDate && (
+      {goesToday && (
         <p role="status" className="-mt-2 font-mono text-[11px] text-ash-dim">
-          A start time needs a day.
+          A start time needs a day, so it goes on today.
         </p>
       )}
 
@@ -135,7 +125,7 @@ function EditForm({ task, onDone }: { task: Task; onDone(): void }) {
             onChange={(e) => setDuration(e.target.value)}
             className="w-28"
           />
-          {[15, 30, 45, 60, 120].map((minutes) => (
+          {DURATION_SHORTCUTS.map(({ minutes, label }) => (
             <button
               key={minutes}
               type="button"
@@ -147,7 +137,7 @@ function EditForm({ task, onDone }: { task: Task; onDone(): void }) {
                   : "border-line text-bone hover:bg-raise",
               )}
             >
-              {minutes < 60 ? `${minutes}m` : `${minutes / 60}h`}
+              {label}
             </button>
           ))}
         </div>
@@ -155,7 +145,7 @@ function EditForm({ task, onDone }: { task: Task; onDone(): void }) {
 
       <Field label="Priority">
         <div className="flex flex-wrap gap-2">
-          {PRIORITIES.map((item) => (
+          {PRIORITY_CHOICES.map((item) => (
             <button
               key={item.value}
               type="button"

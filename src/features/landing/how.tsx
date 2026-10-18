@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { parseLine } from "@/features/tasks/domain/parse-line";
+import { describeDraft, placeLine } from "@/features/tasks/domain/line";
 import { Chips, TaskPanel, WeekView } from "./fragments";
 
 const STEPS = [
@@ -20,10 +20,11 @@ const STEPS = [
 ];
 
 const LINE = "Call 11:00 to 12:30 #work,home tomorrow";
+const TODAY = "2026-01-01";
 
 function Stage({ step }: { step: number }) {
   if (step === 0) {
-    const line = parseLine(LINE, "2026-01-01");
+    const { line, draft } = placeLine(LINE, TODAY, { view: "today" });
     return (
       <div className="ui-win ui-compose" data-ui>
         <div className="ui-win__head">
@@ -36,7 +37,7 @@ function Stage({ step }: { step: number }) {
         </div>
         <Chips tokens={line.tokens} />
         <p className="ui-compose__out">
-          Saves as <strong>{line.title}</strong>, tomorrow from 11:00 to 12:30, tagged work and home.
+          Saves as <strong>{line.title}</strong>, {draft && describeDraft(draft, TODAY)}.
         </p>
       </div>
     );

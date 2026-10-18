@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fromRange, toCalendarEvents } from "./to-calendar-events.ts";
+import { fromRange, fromSelection, toCalendarEvents, weekTotals } from "./to-calendar-events.ts";
 import type { Task } from "../tasks/domain/task.ts";
 
 function task(over: Partial<Task>): Task {
@@ -73,8 +73,8 @@ test("fromRange keeps the duration of a dragged range", () => {
   });
 });
 
-test("fromRange turns a single 15 minute click into a one hour block", () => {
-  assert.deepEqual(fromRange(new Date(2026, 9, 21, 9, 0), new Date(2026, 9, 21, 9, 15)), {
+test("fromSelection turns a single 15 minute click into a one hour block", () => {
+  assert.deepEqual(fromSelection(new Date(2026, 9, 21, 9, 0), new Date(2026, 9, 21, 9, 15)), {
     date: "2026-10-21",
     startMin: 540,
     durationMin: 60,
@@ -87,7 +87,29 @@ test("fromRange rounds to 5 minutes", () => {
   assert.equal(range.durationMin, 45);
 });
 
-test("fromRange never runs past midnight", () => {
-  const range = fromRange(new Date(2026, 9, 21, 23, 30), new Date(2026, 9, 21, 23, 45));
+test("fromSelection never runs past midnight", () => {
+  const range = fromSelection(new Date(2026, 9, 21, 23, 30), new Date(2026, 9, 21, 23, 45));
   assert.equal(range.durationMin, 30);
+});
+
+test("fromRange keeps a 15 minute block at 15 minutes when it is moved", () => {
+  assert.deepEqual(fromRange(new Date(2026, 9, 22, 11, 0), new Date(2026, 9, 22, 11, 15)), {
+    date: "2026-10-22",
+    startMin: 660,
+    durationMin: 15,
+  });
+});
+
+test("weekTotals adds up only the blocks the calendar draws, inside the week", () => {
+  const tasks = [
+    task({ date: "2026-10-21", startMin: 540, durationMin: 60 }),
+    task({ date: "2026-10-21", startMin: 600, durationMin: 30 }),
+    task({ date: "2026-10-22", startMin: null, durationMin: 360 }),
+    task({ date: "2026-10-30", startMin: 540, durationMin: 60 }),
+    task({ date: null, startMin: null, durationMin: 45 }),
+  ];
+  assert.deepEqual(weekTotals(tasks, "2026-10-19", "2026-10-25"), {
+    plannedMin: 90,
+    byDate: { "2026-10-21": 90 },
+  });
 });

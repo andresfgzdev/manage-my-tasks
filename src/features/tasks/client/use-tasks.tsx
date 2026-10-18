@@ -1,124 +1,98 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
-import type { Task, TaskDraft, TaskPatch } from "@/features/tasks/domain/task";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { createContext, useContext, useEffect, useState } from "react";
+import type { Task } from "@/features/tasks/domain/task";
 import { tasksApi } from "./tasks-api";
+import { createTaskSync } from "./task-sync";
+import type { TaskSync } from "./task-sync";
+
+export { isUnsaved } from "./task-sync";
 
 const KEY = ["tasks"] as const;
 const NO_TASKS: Task[] = [];
-const TEMP_PREFIX = "tmp-";
+const STORAGE_KEY = "better-tasks:tasks:v2";
 
-export const TASKS_KEY = KEY;
+export type TaskActions = Pick<TaskSync, "create" | "update" | "toggle" | "duplicate" | "remove">;
+
+const TasksContext = createContext<TaskSync | null>(null);
+
+function readStorage(): Task[] | null {
+  try {
+    const cached: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+    // Older cached tasks have no `tags`: drop them rather than render a broken row.
+    return Array.isArray(cached) && cached.every((t) => Array.isArray(t?.tags)) ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+function setUp() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: 5 * 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
+    },
+  });
+  const sync = createTaskSync({
+    api: tasksApi,
+    publish: (tasks) => queryClient.setQueryData<Task[]>(KEY, tasks),
+  });
+  if (typeof window !== "undefined") {
+    // The last known tasks paint at once, and the request starts now rather than
+    // after the first render's effects.
+    const cached = readStorage();
+    if (cached) sync.seed(cached);
+    queryClient.fetchQuery({ queryKey: KEY, queryFn: sync.load, staleTime: 0 }).catch(() => {});
+  }
+  return { queryClient, sync };
+}
+
+/** Owns the tasks cache: React Query, the optimistic sync and the copy in localStorage. */
+export function TasksProvider({ children }: { children: React.ReactNode }) {
+  const [{ queryClient, sync }] = useState(setUp);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== "updated" || event.query.queryKey[0] !== KEY[0]) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          const confirmed = sync.confirmed();
+          if (confirmed) localStorage.setItem(STORAGE_KEY, JSON.stringify(confirmed));
+        } catch {
+          // Quota or privacy mode: the copy is optional.
+        }
+      }, 300);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [queryClient, sync]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TasksContext.Provider value={sync}>{children}</TasksContext.Provider>
+      {process.env.NODE_ENV === "development" && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
+  );
+}
+
+function useSync(): TaskSync {
+  const sync = useContext(TasksContext);
+  if (!sync) throw new Error("Tasks hooks must be used inside TasksProvider");
+  return sync;
+}
 
 export function useTasks(): { tasks: Task[]; isLoading: boolean; isError: boolean } {
-  const { data, isLoading, isError } = useQuery({ queryKey: KEY, queryFn: tasksApi.list });
+  const sync = useSync();
+  const { data, isLoading, isError } = useQuery({ queryKey: KEY, queryFn: sync.load });
   return { tasks: data ?? NO_TASKS, isLoading, isError };
 }
 
-export function useTaskActions(): {
-  create(draft: TaskDraft): void;
-  update(id: string, patch: TaskPatch): void;
-  toggle(id: string): void;
-  duplicate(id: string): void;
-  remove(id: string): void;
-} {
-  const queryClient = useQueryClient();
-
-  const setTasks = (change: (tasks: Task[]) => Task[]) =>
-    queryClient.setQueryData<Task[]>(KEY, (old) => change(old ?? NO_TASKS));
-  const find = (id: string) => queryClient.getQueryData<Task[]>(KEY)?.find((t) => t.id === id);
-  const replace = (id: string, task: Task) =>
-    setTasks((all) => all.map((t) => (t.id === id ? task : t)));
-  const resync = () => queryClient.invalidateQueries({ queryKey: KEY });
-
-  const createMutation = useMutation({
-    mutationFn: ({ draft }: { draft: TaskDraft; tempId: string }) => tasksApi.create(draft),
-    onMutate: async ({ draft, tempId }) => {
-      await queryClient.cancelQueries({ queryKey: KEY });
-      const now = new Date().toISOString();
-      setTasks((all) => [
-        ...all,
-        {
-          date: null,
-          startMin: null,
-          durationMin: 0,
-          priority: 0,
-          tags: [],
-          note: "",
-          ...draft,
-          id: tempId,
-          done: false,
-          steps: [],
-          createdAt: now,
-          updatedAt: now,
-        },
-      ]);
-    },
-    onSuccess: (task, { tempId }) => replace(tempId, task),
-    // A failed write rolls back and resyncs: the UI itself is the feedback.
-    onError: (_error, { tempId }) => {
-      setTasks((all) => all.filter((t) => t.id !== tempId));
-      resync();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: TaskPatch }) => tasksApi.update(id, patch),
-    onMutate: async ({ id, patch }) => {
-      await queryClient.cancelQueries({ queryKey: KEY });
-      const previous = find(id);
-      if (previous) replace(id, { ...previous, ...patch });
-      return { previous };
-    },
-    onSuccess: (task) => replace(task.id, task),
-    onError: (_error, { id }, context) => {
-      if (context?.previous) replace(id, context.previous);
-      resync();
-    },
-  });
-
-  // Actions on a task that is still being created (temporary id) are ignored:
-  // the window is a few milliseconds and the server does not know that id yet.
-  const isTemporary = (id: string) => id.startsWith(TEMP_PREFIX);
-
-  const { mutate: create } = createMutation;
-  const { mutate: save } = updateMutation;
-
-  // Stable identity: memoised rows depend on it.
-  return useMemo(() => {
-    const update = (id: string, patch: TaskPatch) => {
-      if (!isTemporary(id)) save({ id, patch });
-    };
-    return {
-      create: (draft: TaskDraft) =>
-        create({ draft, tempId: `${TEMP_PREFIX}${crypto.randomUUID()}` }),
-
-      update,
-
-      toggle: (id: string) => {
-        const task = find(id);
-        if (task && !isTemporary(id)) update(id, { done: !task.done });
-      },
-
-      duplicate: (id: string) => {
-        const task = find(id);
-        if (!task || isTemporary(id)) return;
-        const { title, date, startMin, durationMin, priority, tags, note } = task;
-        create({
-          draft: { title, date, startMin, durationMin, priority, tags: [...tags], note },
-          tempId: `${TEMP_PREFIX}${crypto.randomUUID()}`,
-        });
-      },
-
-      // Optimistic: the task leaves the cache now. If the server refuses, it
-      // comes back on the resync.
-      remove: (id: string) => {
-        if (isTemporary(id) || !find(id)) return;
-        setTasks((all) => all.filter((t) => t.id !== id));
-        tasksApi.remove(id).catch(resync);
-      },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryClient, create, save]);
+/** Stable for the life of the app: memoised rows can depend on it. */
+export function useTaskActions(): TaskActions {
+  return useSync();
 }

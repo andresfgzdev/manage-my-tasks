@@ -8,7 +8,7 @@ import { DurationRule } from "@/components/ds/duration-rule";
 import { PriorityBars } from "@/components/ds/priority-bars";
 import { Tick } from "@/components/ds/tick";
 import { cn } from "@/lib/utils";
-import { useTaskActions } from "@/features/tasks/client/use-tasks";
+import { isUnsaved, useTaskActions } from "@/features/tasks/client/use-tasks";
 import { removeTimeMention, splitTimeMentions } from "@/features/tasks/domain/parse-line";
 import type { Task } from "@/features/tasks/domain/task";
 import { formatDuration, formatHM, formatRange } from "@/features/tasks/domain/time";
@@ -110,7 +110,7 @@ export const TaskRow = memo(function TaskRow({
   const [fresh] = useState(() => Date.now() - Date.parse(task.createdAt) < FRESH_MS);
   // A fresh row that already has its real id replaced the optimistic one a
   // moment ago and was animated then: it must not fade in a second time.
-  const animateEntry = !fresh || task.id.startsWith("tmp-");
+  const animateEntry = !fresh || isUnsaved(task);
 
   const onContextMenu = useContextMenuHandler(() =>
     taskMenu(task, () => onOpen(task.id)),

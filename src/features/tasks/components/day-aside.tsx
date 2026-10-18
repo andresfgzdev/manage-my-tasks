@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { hourPlan } from "@/features/tasks/domain/spine";
-import { formatDuration, toIsoDate } from "@/features/tasks/domain/time";
+import { formatDuration, formatHM } from "@/features/tasks/domain/time";
 import { useQuickAdd } from "./quick-add";
 
 const FROM_HOUR = 7;
@@ -34,7 +34,7 @@ function Help({ children }: { children: React.ReactNode }) {
   );
 }
 
-const hourLabel = (h: number) => `${String(h).padStart(2, "0")}:00`;
+const hourLabel = (h: number) => formatHM(h * 60);
 
 function Legend({ color, children }: { color: string; children: React.ReactNode }) {
   return (
@@ -48,7 +48,7 @@ function Legend({ color, children }: { color: string; children: React.ReactNode 
 function Rhythm() {
   const now = useNow();
   const { tasks } = useTasks();
-  const today = now ? toIsoDate(now) : null;
+  const today = now?.today ?? null;
   const plan = useMemo(
     () => (today ? hourPlan(tasks, today, FROM_HOUR, TO_HOUR) : []),
     [tasks, today],
@@ -58,7 +58,7 @@ function Rhythm() {
 
   const planned = plan.reduce((sum, p) => sum + p.minutes, 0);
   const busiest = Math.max(60, ...plan.map((p) => p.minutes));
-  const currentHour = now.getHours();
+  const currentHour = Math.floor(now.minute / 60);
   const nextFree = plan.findIndex((p, i) => p.blocks === 0 && FROM_HOUR + i >= currentHour);
 
   return (

@@ -7,17 +7,16 @@ import { Chip } from "@/components/ds/chip";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTaskActions } from "@/features/tasks/client/use-tasks";
-import { parseLine } from "@/features/tasks/domain/parse-line";
-import type { LineTokenKind } from "@/features/tasks/domain/parse-line";
-import { defaultDateFor } from "@/features/tasks/domain/spine";
+import { placeLine } from "@/features/tasks/domain/line";
+import type { Block, LineWhere } from "@/features/tasks/domain/line";
+import { TOKEN_KIND_LABELS } from "@/features/tasks/domain/parse-line";
 import type { Lens } from "@/features/tasks/domain/spine";
-import { dayTitle, formatDuration, formatHM, toIsoDate } from "@/features/tasks/domain/time";
+import { formatBlock, toIsoDate } from "@/features/tasks/domain/time";
 
-type Range = { date: string; startMin: number; durationMin: number };
 
 export type QuickAddApi = {
-  pending: Range | null;
-  setPendingRange(range: Range | null): void;
+  pending: Block | null;
+  setPendingRange(range: Block | null): void;
   focus(): void;
   /** Appends a piece of Line syntax to the input (the cheat sheet and hint chips use it). */
   insert(snippet: string): void;
@@ -33,7 +32,7 @@ type QuickAddState = QuickAddApi & {
 const QuickAddContext = createContext<QuickAddState | null>(null);
 
 export function QuickAddProvider({ children }: { children: React.ReactNode }) {
-  const [pending, setPending] = useState<Range | null>(null);
+  const [pending, setPending] = useState<Block | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const insertRef = useRef<(snippet: string) => void>(() => {});
 
@@ -63,14 +62,6 @@ export function useQuickAdd(): QuickAddApi {
   return { pending, setPendingRange, focus, insert };
 }
 
-const KIND_LABEL: Record<LineTokenKind, string> = {
-  time: "at",
-  duration: "lasts",
-  priority: "priority",
-  tag: "tag",
-  day: "day",
-};
-
 const HINTS = [
   { snippet: "15:30", title: "Start time, or a range like 13:30 to 15:30" },
   { snippet: "~45m", title: "Duration: ~45m, ~2h" },
@@ -79,12 +70,10 @@ const HINTS = [
   { snippet: "tomorrow", title: "Day: today or tomorrow" },
 ];
 
-function describeRange(range: Range): string {
-  const [y, m, d] = range.date.split("-").map(Number);
-  const day = dayTitle(new Date(y, m - 1, d)).name.slice(0, 3);
-  const end = range.startMin + range.durationMin;
-  return `${day} ${d} · ${formatHM(range.startMin)} → ${formatHM(end)} · ${formatDuration(range.durationMin)}`;
-}
+const NOTICES = {
+  "needs-time": "Missing a time: select a block or type a time like 15:30.",
+  refused: "That task couldn't be saved, so it's back in the Line.",
+};
 
 export function QuickAdd() {
   const { pending, setPendingRange, inputRef, insertRef, insert } = useQuickAddState();
@@ -92,13 +81,14 @@ export function QuickAdd() {
   const now = useNow();
   const actions = useTaskActions();
   const [text, setText] = useState("");
-  const [needsTime, setNeedsTime] = useState(false);
+  const [notice, setNotice] = useState<keyof typeof NOTICES | null>(null);
 
   const isWeek = pathname === "/week";
   const lens: Lens = pathname === "/next" ? "next" : pathname === "/inbox" ? "inbox" : "today";
   // A range picked on the calendar only applies while the calendar is showing.
   const range = isWeek ? pending : null;
-  const parsed = parseLine(text, toIsoDate(now ?? new Date(0)));
+  const where: LineWhere = isWeek ? { view: "week", block: range } : { view: lens };
+  const parsed = placeLine(text, now?.today ?? toIsoDate(new Date()), where).line;
 
   // The Line is ready as soon as the page opens.
   useEffect(() => {
@@ -110,33 +100,39 @@ export function QuickAdd() {
       inputRef.current?.focus();
     };
   }, [insertRef, inputRef]);
+  // The landing's closing form opens /today?line=…: that line waits here, ready for Enter.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const line = url.searchParams.get("line");
+    if (line === null) return;
+    url.searchParams.delete("line");
+    window.history.replaceState(window.history.state, "", url);
+    insertRef.current(line.trim());
+  }, [insertRef]);
 
   const clear = () => {
     setText("");
     setPendingRange(null);
-    setNeedsTime(false);
+    setNotice(null);
   };
 
   const submit = () => {
-    const today = toIsoDate(new Date());
-    const line = parseLine(text, today);
-    if (!line.title) return;
-
-    const startMin = range?.startMin ?? line.startMin;
-    if (isWeek && startMin === null) {
-      setNeedsTime(true);
+    const placement = placeLine(text, toIsoDate(new Date()), where);
+    if (placement.needsTime) {
+      setNotice("needs-time");
       return;
     }
+    if (!placement.draft) return;
 
-    actions.create({
-      title: line.title,
-      date: range?.date ?? line.date ?? (isWeek ? today : defaultDateFor(lens, today)),
-      startMin,
-      durationMin: range?.durationMin ?? line.durationMin,
-      priority: line.priority,
-      tags: line.tags,
-    });
+    const typed = text;
+    const { saved } = actions.create(placement.draft);
     clear();
+    void saved.then((ok) => {
+      if (ok) return;
+      // Give the words back unless something new was typed meanwhile.
+      setText((current) => (current === "" ? typed : current));
+      setNotice("refused");
+    });
   };
 
   return (
@@ -162,7 +158,7 @@ export function QuickAdd() {
             }
             onChange={(e) => {
               setText(e.target.value);
-              setNeedsTime(false);
+              setNotice(null);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -189,7 +185,7 @@ export function QuickAdd() {
             <div className="flex items-center gap-1">
               <Chip tone="sodium">
                 <Calendar className="size-3.5" aria-hidden="true" />
-                {describeRange(range)}
+                {formatBlock(range.date, range.startMin, range.durationMin)}
               </Chip>
               <button
                 type="button"
@@ -217,7 +213,7 @@ export function QuickAdd() {
                 <Chip
                   key={`${token.kind}-${token.label}`}
                   tone={token.kind === "time" || token.kind === "day" ? "sodium" : "neutral"}
-                  kind={KIND_LABEL[token.kind]}
+                  kind={TOKEN_KIND_LABELS[token.kind]}
                 >
                   {token.label}
                 </Chip>
@@ -229,9 +225,9 @@ export function QuickAdd() {
           )}
         </div>
 
-        {needsTime && (
+        {notice && (
           <p role="status" className="animate-fade-in pl-7 font-mono text-[11px] text-ash-dim">
-            Missing a time: select a block or type a time like 15:30.
+            {NOTICES[notice]}
           </p>
         )}
       </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { useNow } from "@/features/tasks/client/use-now";
 import { formatHM } from "@/features/tasks/domain/time";
-import { useNow } from "./use-now";
+import { FALLBACK_NOW } from "./fragments";
 
 /** Marks the page as scripted and reveals [data-reveal] blocks once as they enter. Never leaves content hidden. */
 export function Reveal() {
@@ -33,14 +34,14 @@ export function Reveal() {
 
 /** The visitor's own time, for the footer. */
 export function LocalTime() {
-  const now = useNow();
-  const left = 24 * 60 - now.min;
+  const minute = useNow()?.minute ?? FALLBACK_NOW.minute;
+  const left = 24 * 60 - minute;
   return (
     <>
-      <span className="bt-tile__big" suppressHydrationWarning>
-        <span key={now.min} className="bt-roll">{formatHM(now.min)}</span>
+      <span className="bt-tile__big">
+        <span key={minute} className="bt-roll">{formatHM(minute)}</span>
       </span>
-      <span suppressHydrationWarning>
+      <span>
         on your clock. Today has {Math.floor(left / 60)} h {left % 60} min left.
       </span>
     </>

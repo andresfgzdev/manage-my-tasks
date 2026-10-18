@@ -1,13 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import {
+  DURATION_SHORTCUTS,
+  PRIORITY_CHOICES,
+  formatTags,
+  readTags,
+  readTimeText,
+} from "@/features/tasks/domain/edit";
 import type { Priority } from "@/features/tasks/domain/task";
 import { addDays, formatDuration, formatHM } from "@/features/tasks/domain/time";
-import { parseTags } from "./tag-input";
 
+/**
+ * A field edited locally and saved once: on blur, on Enter, or when the popover
+ * closes. Inputs that fire on every keystroke or drag step stay off the network.
+ */
+function useDraft<T>(value: T, commit: (value: T) => void) {
+  const [draft, setDraft] = useState(value);
+  const latest = useRef({ draft, value, commit });
+  useEffect(() => {
+    latest.current = { draft, value, commit };
+  });
+  const flush = () => {
+    const current = latest.current;
+    if (current.draft !== current.value) {
+      current.value = current.draft;
+      current.commit(current.draft);
+    }
+  };
+  // Closing the popover unmounts the editor without a blur.
+  useEffect(
+    () => () => {
+      const current = latest.current;
+      if (current.draft !== current.value) current.commit(current.draft);
+    },
+    [],
+  );
+  return [draft, setDraft, flush] as const;
+}
 
 export function SentenceToken({
   label,
@@ -111,29 +144,25 @@ export function TimeEditor({
   startMin: number | null;
   onChange(startMin: number | null): void;
 }) {
+  const [text, setText, flush] = useDraft(startMin === null ? "" : formatHM(startMin), (value) =>
+    onChange(readTimeText(value)),
+  );
+
   return (
     <>
       <Input
         type="time"
         step={300}
         aria-label="Start time"
-        value={startMin === null ? "" : formatHM(startMin)}
-        onChange={(e) => {
-          const [h, m] = e.target.value.split(":").map(Number);
-          onChange(e.target.value ? h * 60 + m : null);
-        }}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={flush}
+        onKeyDown={(e) => e.key === "Enter" && flush()}
       />
       {startMin !== null && <Choice onClick={() => onChange(null)}>No time</Choice>}
     </>
   );
 }
-
-const DURATION_SHORTCUTS = [
-  { minutes: 15, label: "15m" },
-  { minutes: 30, label: "30m" },
-  { minutes: 45, label: "45m" },
-  { minutes: 60, label: "1h" },
-];
 
 export function DurationEditor({
   minutes,
@@ -144,12 +173,18 @@ export function DurationEditor({
   startMin: number | null;
   onChange(minutes: number): void;
 }) {
+  // The slider moves in 5 minute steps: each one shows, only the last one is saved.
+  const [draft, setDraft, flush] = useDraft(minutes, onChange);
+  const pick = (value: number) => {
+    setDraft(value);
+    onChange(value);
+  };
   const summary =
-    minutes === 0
+    draft === 0
       ? "No duration"
       : startMin === null
-        ? formatDuration(minutes)
-        : `Ends ${formatHM((startMin + minutes) % 1440)}`;
+        ? formatDuration(draft)
+        : `Ends ${formatHM((startMin + draft) % 1440)}`;
 
   return (
     <>
@@ -157,8 +192,8 @@ export function DurationEditor({
         {DURATION_SHORTCUTS.map((shortcut) => (
           <Choice
             key={shortcut.minutes}
-            active={minutes === shortcut.minutes}
-            onClick={() => onChange(shortcut.minutes)}
+            active={draft === shortcut.minutes}
+            onClick={() => pick(shortcut.minutes)}
           >
             {shortcut.label}
           </Choice>
@@ -171,23 +206,19 @@ export function DurationEditor({
           max={240}
           step={5}
           aria-label="Duration in minutes"
-          value={Math.min(Math.max(minutes, 5), 240)}
-          onChange={(e) => onChange(Number(e.target.value))}
+          value={Math.min(Math.max(draft, 5), 240)}
+          onChange={(e) => setDraft(Number(e.target.value))}
+          onPointerUp={flush}
+          onKeyUp={flush}
+          onBlur={flush}
           className="h-1 flex-1 cursor-pointer accent-sodium"
         />
         <span className="w-20 text-right font-mono text-xs text-ash">{summary}</span>
       </div>
-      {minutes > 0 && <Choice onClick={() => onChange(0)}>No duration</Choice>}
+      {draft > 0 && <Choice onClick={() => pick(0)}>No duration</Choice>}
     </>
   );
 }
-
-const PRIORITIES: { value: Priority; label: string }[] = [
-  { value: 0, label: "None" },
-  { value: 1, label: "Low" },
-  { value: 2, label: "Medium" },
-  { value: 3, label: "High" },
-];
 
 export function PriorityEditor({
   priority,
@@ -200,7 +231,7 @@ export function PriorityEditor({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {PRIORITIES.map((item) => (
+      {PRIORITY_CHOICES.map((item) => (
         <Choice
           key={item.value}
           active={priority === item.value}
@@ -225,10 +256,10 @@ export function TagEditor({
   onChange(tags: string[]): void;
   close(): void;
 }) {
-  const [value, setValue] = useState(tags.map((t) => `#${t}`).join(", "));
+  const [value, setValue] = useState(formatTags(tags));
 
   const commit = () => {
-    const next = parseTags(value);
+    const next = readTags(value);
     if (next.join() !== tags.join()) onChange(next);
   };
 

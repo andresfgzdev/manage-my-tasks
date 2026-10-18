@@ -1,18 +1,20 @@
 import type { LineToken } from "@/features/tasks/domain/parse-line";
-import { splitTimeMentions } from "@/features/tasks/domain/parse-line";
+import { TOKEN_KIND_LABELS, splitTimeMentions } from "@/features/tasks/domain/parse-line";
+import { isLate } from "@/features/tasks/domain/spine";
+import { PRIORITY_NAMES } from "@/features/tasks/domain/task";
+import type { Priority, Task } from "@/features/tasks/domain/task";
 import { formatHM, formatRange } from "@/features/tasks/domain/time";
 
 /* Cropped pieces of the Better Tasks interface, drawn in HTML. Each root carries data-ui. */
 
-export type SpineTask = {
-  id: string;
-  title: string;
+/** A timed task as the sketches draw it. */
+export type SpineTask = Pick<Task, "id" | "title" | "durationMin" | "priority" | "tags"> & {
   startMin: number;
-  durationMin: number;
-  priority: 0 | 1 | 2 | 3;
-  tags: string[];
   fresh?: boolean;
 };
+
+/** Server render and first paint use a fixed 10:40 on a Monday, then the visitor's clock. */
+export const FALLBACK_NOW = { minute: 640, label: "Monday, Oct 12" };
 
 export const SAMPLE_DAY: SpineTask[] = [
   { id: "a", title: "Plan the week", startMin: 540, durationMin: 30, priority: 0, tags: ["home"] },
@@ -40,7 +42,7 @@ export function TaskText({ title }: { title: string }) {
 export function Flags({ priority }: { priority: number }) {
   if (!priority) return null;
   return (
-    <span className="ui-flag" aria-label={`Priority ${["", "low", "medium", "high"][priority]}`}>
+    <span className="ui-flag" aria-label={`Priority ${PRIORITY_NAMES[priority as Priority]}`}>
       {"!".repeat(priority)}
     </span>
   );
@@ -51,19 +53,15 @@ export function Chips({ tokens }: { tokens: LineToken[] }) {
     <ul className="ui-chips" aria-label="What the line was read as">
       {tokens.map((t, i) => (
         <li key={`${t.kind}-${i}`} className={`ui-chip ui-chip--${t.kind}`}>
-          <span className="ui-chip__k">{chipName(t.kind)}</span> {t.label}
+          <span className="ui-chip__k">{TOKEN_KIND_LABELS[t.kind]}</span> {t.label}
         </li>
       ))}
     </ul>
   );
 }
 
-function chipName(kind: LineToken["kind"]): string {
-  return { time: "at", duration: "for", priority: "priority", tag: "tag", day: "on" }[kind];
-}
-
-/** The Today spine: hours down the side, tasks placed by minute, a now marker. */
-export function DaySpine({
+/** A sketch of the Today spine: hours down the side, tasks placed by minute, a now marker. */
+export function DaySketch({
   tasks,
   nowMin,
   fromH = 8,
@@ -87,7 +85,7 @@ export function DaySpine({
         </div>
       ))}
       {tasks.map((t) => {
-        const past = t.startMin + t.durationMin <= nowMin;
+        const past = isLate(t.startMin, t.durationMin, nowMin);
         return (
           <div
             key={t.id}
@@ -130,7 +128,7 @@ export function TodayView({ nowMin }: { nowMin: number }) {
       <div className="ui-line ui-line--idle">
         <span className="ui-line__ph">Add a task: Dentist 9am ~30m #health</span>
       </div>
-      <DaySpine
+      <DaySketch
         tasks={SAMPLE_DAY}
         nowMin={nowMin}
         fromH={Math.min(8, Math.floor(nowMin / 60))}
