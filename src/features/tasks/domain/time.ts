@@ -51,3 +51,13 @@ export function weekRange(today: string): { from: string; to: string } {
   const from = addDays(today, -sinceMonday);
   return { from, to: addDays(from, 6) };
 }
+
+/** ISO 8601 week number (weeks start on Monday; week 1 holds the first Thursday). */
+export function isoWeek(iso: string): number {
+  const date = parseIso(iso);
+  const thursday = new Date(date);
+  thursday.setUTCDate(date.getUTCDate() + 3 - ((date.getUTCDay() + 6) % 7));
+  const firstThursday = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
+  const diffDays = (thursday.getTime() - firstThursday.getTime()) / 86400000;
+  return 1 + Math.round((diffDays - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+}

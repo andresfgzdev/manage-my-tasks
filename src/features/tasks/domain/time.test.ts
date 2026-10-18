@@ -5,6 +5,7 @@ import {
   dayTitle,
   formatDuration,
   formatHM,
+  isoWeek,
   shiftOf,
   toIsoDate,
   weekRange,
@@ -53,4 +54,14 @@ test("weekRange is Monday to Sunday", () => {
   assert.deepEqual(weekRange("2026-10-17"), { from: "2026-10-12", to: "2026-10-18" });
   assert.deepEqual(weekRange("2026-10-12"), { from: "2026-10-12", to: "2026-10-18" });
   assert.deepEqual(weekRange("2026-10-18"), { from: "2026-10-12", to: "2026-10-18" });
+});
+
+test("isoWeek follows ISO 8601", () => {
+  assert.equal(isoWeek("2026-10-17"), 42);
+  assert.equal(isoWeek("2026-10-12"), 42);
+  assert.equal(isoWeek("2026-10-18"), 42);
+  assert.equal(isoWeek("2026-10-19"), 43);
+  assert.equal(isoWeek("2026-01-01"), 1);
+  assert.equal(isoWeek("2024-12-30"), 1);
+  assert.equal(isoWeek("2021-01-03"), 53);
 });
