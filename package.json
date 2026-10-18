@@ -7,15 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test \"src/**/*.test.ts\""
+    "test": "node --test \"src/**/*.test.ts\"",
+    "db:setup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-setup.mts"
   },
   "dependencies": {
     "@fullcalendar/react": "7.1.3",
     "@tanstack/react-query": "5.104.4",
     "@tanstack/react-query-devtools": "5.104.4",
+    "better-auth": "1.7.10",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "lucide-react": "1.59.0",
+    "mongodb": "7.7.0",
     "next": "16.4.2",
     "radix-ui": "1.8.1",
     "react": "19.3.1",

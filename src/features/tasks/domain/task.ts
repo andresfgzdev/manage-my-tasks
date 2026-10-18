@@ -16,7 +16,8 @@ export type Task = {
   updatedAt: string;
 };
 
-export type TaskDraft = { title: string } & Partial<
+// The client may name a new task (a UUID): its optimistic copy then never changes id.
+export type TaskDraft = { title: string; id?: string } & Partial<
   Pick<Task, "date" | "startMin" | "durationMin" | "priority" | "tags" | "note">
 >;
 export type TaskPatch = Partial<Omit<Task, "id" | "createdAt" | "updatedAt">>;
@@ -31,6 +32,7 @@ export const MAX_DURATION = 1440;
 // Marks (\p{M}) are allowed because lowercasing can produce them: "İ" → "i̇".
 const TAG_PATTERN = /^[\p{L}\p{M}\d_-]{1,32}$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Indexed by `Priority`. */
 export const PRIORITY_NAMES = ["none", "low", "medium", "high"] as const;
@@ -103,6 +105,7 @@ function validateSteps(v: unknown): Result<Step[]> {
 }
 
 const fieldValidators: Record<string, (v: unknown) => Result<unknown>> = {
+  id: (v) => (typeof v === "string" && UUID_PATTERN.test(v) ? { ok: true, value: v.toLowerCase() } : fail("Invalid id")),
   title: validateTitle,
   date: (v) => {
     if (v === null) return { ok: true, value: null };
@@ -153,7 +156,7 @@ function validateFields(input: unknown, allowed: string[]): Result<Record<string
 }
 
 export function validateDraft(input: unknown): Result<TaskDraft> {
-  const fields = validateFields(input, DRAFT_KEYS);
+  const fields = validateFields(input, [...DRAFT_KEYS, "id"]);
   if (!fields.ok) return fields;
   if (!("title" in fields.value)) return fail("Title is required");
   if (fields.value.startMin != null && fields.value.date == null) {

@@ -64,7 +64,7 @@ test("validateDraft rejects unknown keys and non-objects", () => {
   });
   assert.deepEqual(validateDraft({ title: "x", id: "1" }), {
     ok: false,
-    error: "Unknown field: id",
+    error: "Invalid id",
   });
   assert.equal(validateDraft(null).ok, false);
   assert.equal(validateDraft("x").ok, false);

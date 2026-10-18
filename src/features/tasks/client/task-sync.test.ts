@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newTask } from "../domain/task.ts";
 import type { Task, TaskDraft, TaskPatch } from "../domain/task.ts";
-import { createTaskSync, isUnsaved } from "./task-sync.ts";
+import { createTaskSync } from "./task-sync.ts";
 
 const NOW = new Date("2026-10-17T10:00:00.000Z");
 
@@ -34,7 +34,8 @@ function fakeServer(initial: Task[] = []) {
       list: () => later("list", () => tasks.map((t) => ({ ...t }))),
       create: (draft: TaskDraft) =>
         later(`create ${draft.title}`, () => {
-          const task = newTask(draft, `s${++ids}`, NOW.toISOString());
+          const { id = `s${++ids}`, ...fields } = draft;
+          const task = newTask(fields, id, NOW.toISOString());
           tasks = [...tasks, task];
           return task;
         }),
@@ -69,20 +70,19 @@ function setup(initial: Task[] = []) {
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-test("create shows the task at once, with the domain defaults, and swaps in the real one", async () => {
+test("create shows the task at once, with the domain defaults, under the id it keeps", async () => {
   const { server, sync, shown } = setup();
   const { id, saved } = sync.create({ title: "Plan" });
   assert.equal(shown().length, 1);
-  assert.ok(isUnsaved(shown()[0]));
-  assert.deepEqual({ ...shown()[0], id: "x" }, { ...newTask({ title: "Plan" }, "x", NOW.toISOString()) });
+  assert.deepEqual(shown()[0], newTask({ title: "Plan" }, id, NOW.toISOString()));
   await tick();
   server.answer("create");
   assert.equal(await saved, true);
-  assert.equal(shown()[0].id, "s1");
-  assert.notEqual(id, "s1");
+  assert.equal(shown()[0].id, id, "the saved task is the same row: it never changes id");
+  assert.equal(server.tasks[0].id, id, "the server keeps the client's id");
 });
 
-test("edits made before the create is confirmed are kept and replayed with the real id", async () => {
+test("edits made before the create is confirmed are kept and sent after it", async () => {
   const { server, sync, shown } = setup();
   const { id } = sync.create({ title: "Plan" });
   sync.toggle(id);
@@ -93,11 +93,11 @@ test("edits made before the create is confirmed are kept and replayed with the r
   await tick();
   server.answer("create");
   await tick();
-  server.answer('update s1 {"done":true}');
+  server.answer(`update ${id} {"done":true}`);
   await tick();
-  server.answer("update s1");
+  server.answer(`update ${id}`);
   await sync.settled();
-  assert.deepEqual(server.calls, ["create Plan", 'update s1 {"done":true}', 'update s1 {"title":"Plan the week"}']);
+  assert.deepEqual(server.calls, ["create Plan", `update ${id} {"done":true}`, `update ${id} {"title":"Plan the week"}`]);
   assert.equal(server.tasks[0].done, true);
   assert.equal(shown()[0].title, "Plan the week");
 });
