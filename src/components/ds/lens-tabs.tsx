@@ -24,7 +24,7 @@ export function LensTabs({ items, activeHref }: { items: Item[]; activeHref?: st
     <nav aria-label="Views" className="relative flex overflow-x-auto border-b border-line">
       {items.map((item) =>
         item.disabled ? (
-          <span key={item.href} aria-disabled="true" className={cn(ITEM, "cursor-not-allowed text-faint")}>
+          <span key={item.href} aria-disabled="true" className={cn(ITEM, "cursor-not-allowed text-ash-dim")}>
             {item.label}
           </span>
         ) : (

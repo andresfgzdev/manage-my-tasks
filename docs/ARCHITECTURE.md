@@ -436,6 +436,7 @@ Source of truth: `src/app/globals.css`. Values come from the *Palette and typogr
   --color-moss: #8FCB9B;         /* done; personal category */
   --color-ice: #8DB8FF;          /* study category */
   --color-ember: #E5484D;        /* delete */
+  --color-ember-soft: #F2777A;   /* delete text on raise or an ember tint */
 
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
@@ -452,6 +453,11 @@ Source of truth: `src/app/globals.css`. Values come from the *Palette and typogr
   --animate-chip-in: chip-in 180ms var(--ease-out-strong) both;
   --animate-wash: wash 1400ms ease-out both;
   --animate-pop: pop 520ms var(--ease-out-strong) both;
+  --animate-view-in: view-in 320ms var(--ease-out-strong) both;
+  --animate-rise: rise 420ms var(--ease-out-strong) both;
+  --animate-fade-in: fade-in 200ms ease-out both;
+  --animate-menu-in: menu-in 140ms var(--ease-out-strong) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
 /* shadcn: its semantic variables point at the palette (dark only) */
@@ -500,9 +506,19 @@ The `@theme inline { --color-background: var(--background); … }` block that sh
 | View indicator | `translateX` | 260 ms `ease-in-out-strong` |
 | Toast | translateY 16px + fade | 240 ms |
 | Block created in Week | `animate-pop` | 520 ms |
+| View changes | opacity + translateY 8px (`animate-view-in`) | 320 ms |
+| Shell enters (header, tabs, content) | opacity + translateY 14px, 70 ms cascade (`animate-rise`) | 420 ms |
+| Hint, calendar block or hour bar appears | opacity (`animate-fade-in`) | 200 ms |
+| Actions menu opens | opacity + scale .96→1 (`animate-menu-in`) | 140 ms |
+| Popover / tooltip | tw-animate fade + zoom 95% | 150 ms |
+| Loading skeleton | opacity pulse (`animate-shimmer`) | 1.6 s loop |
+| Now marker | ring scale + fade (`now-ring`) | 2400 ms loop |
+| Hover on a raised surface | `translateY(-1px)` (`lift`) | 160 ms |
+| Row leaves (delete) | `grid-template-rows` 1fr→0fr + fade | 220 ms |
+| Delete button arms | `grid-template-columns` 0fr→1fr | 200 ms |
 | No animation | typing, Enter in QuickAdd, shortcuts, calendar drag | 0 ms |
 
-Rules: animate only `transform`, `opacity`, `filter`, `clip-path`, colours; never `transition: all`; hover only under `@media (hover:hover) and (pointer:fine)`; `prefers-reduced-motion: reduce` → fades only (no translate/scale/blur), no marker pulse.
+Rules: animate only `transform`, `opacity`, `filter`, `clip-path`, colours (exceptions: the `grid-template-*` collapses above, the only way to give space back smoothly, and two small reveals: the hour bars' `height` when the plan changes and the time-mention X's `max-width`); never `transition: all`; hover only under `@media (hover:hover) and (pointer:fine)`; `prefers-reduced-motion: reduce` → every animation and transition drops to 1 ms, pressed controls keep their size and `lift` does not rise: nothing moves, no marker pulse.
 
 **Accessibility:** text contrast ≥ 4.5:1 (3:1 at ≥ 24 px); real controls (`button`, `a`, `input`); `aria-label` on icon buttons; visible focus `ring-2 ring-sodium/60`; colours that must be told apart also differ in luminance.
 

@@ -171,7 +171,7 @@ function MenuSurface({ menu, onClose }: { menu: OpenMenu; onClose(): void }) {
             className={cn(
               "flex h-9 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-left text-[13px] outline-none transition-[background-color,color,transform] duration-100 active:scale-[0.98] [&_svg]:size-4 [&_svg]:shrink-0",
               item.danger
-                ? "text-ember hover:bg-ember/10 focus-visible:bg-ember/10"
+                ? "text-ember-soft hover:bg-ember/10 focus-visible:bg-ember/10"
                 : "text-bone hover:bg-surface focus-visible:bg-surface",
               armed && "bg-ember text-ground hover:bg-ember focus-visible:bg-ember",
             )}

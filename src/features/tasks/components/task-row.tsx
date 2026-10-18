@@ -148,7 +148,7 @@ export const TaskRow = memo(function TaskRow({
             <span
               className={cn(
                 "w-[52px] shrink-0 text-right font-mono text-[13px] transition-colors",
-                task.done ? "text-faint" : overdue ? "text-sodium" : "text-ash",
+                task.done ? "text-ash-dim" : overdue ? "text-sodium" : "text-ash",
               )}
             >
               {task.startMin === null ? "—" : formatHM(task.startMin)}

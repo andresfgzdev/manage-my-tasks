@@ -20,6 +20,7 @@
   --color-moss: #8FCB9B;         /* done; personal category */
   --color-ice: #8DB8FF;          /* study category */
   --color-ember: #E5484D;        /* delete */
+  --color-ember-soft: #F2777A;   /* delete text on raise or an ember tint */
 
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
@@ -179,7 +180,7 @@
 /* Interactive surfaces share one fast, GPU-only feel. */
 @utility lift {
   transition: transform 160ms var(--ease-out-strong), box-shadow 160ms var(--ease-out-strong), background-color 160ms, border-color 160ms;
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     &:hover {
       transform: translateY(-1px);
     }
@@ -191,5 +192,9 @@
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+  /* No displacement at all: pressed controls keep their size. */
+  .press:active {
+    transform: none;
   }
 }

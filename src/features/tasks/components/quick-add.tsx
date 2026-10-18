@@ -173,7 +173,7 @@ export function QuickAdd() {
           <span
             className={cn(
               "font-mono text-[11px] whitespace-nowrap transition-colors",
-              parsed.title ? "text-sodium" : "text-faint",
+              parsed.title ? "text-sodium" : "text-ash-dim",
             )}
           >
             ↵ create
