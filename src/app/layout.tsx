@@ -30,7 +30,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
-      <body>
+      {/* Browser extensions inject attributes into <body> before hydration. */}
+      <body suppressHydrationWarning>
         <Providers>{children}</Providers>
         <Toaster />
       </body>
