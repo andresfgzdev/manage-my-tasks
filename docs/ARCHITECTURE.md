@@ -84,7 +84,7 @@ Real authentication · database · task sharing and any people/shared UI (not ev
 | D4 | **Steps are embedded in `Task`.** `/api/subtasks` is removed. | One aggregate, one route, one optimistic update. Resolves H4. | Separate resource (current duplication). |
 | D5 | **Route Handlers + React Query** for data. No Server Actions. | React Query is part of the fixed stack; Route Handlers give a simple, testable HTTP seam. Server Functions dispatch serially and would duplicate the pattern. | Server Actions + `useOptimistic`. |
 | D6 | **Identity exists only on the server** via `getCurrentUserId()` (`src/lib/session.ts`). The client never sends `userId`. | Resolves H3 and leaves the seam ready for real auth. | Passing `userId` from the client. |
-| D7 | **FullCalendar v7** (`@fullcalendar/react` 7.1.x, a single package with subpaths) wrapped in a single `WeekCalendar` adapter. Own styling via CSS, no FullCalendar themes. | Ships range selection by dragging, snapping, now indicator and move/resize out of the box. The adapter isolates the FC API from the rest of the app. | Own calendar (more code); react-big-calendar (no rich selection); v6 packages (separate `@fullcalendar/timegrid`, `/interaction`, `/core`) — **do not install**. |
+| D7 | **FullCalendar v7** (`@fullcalendar/react` 7.1.x, a single package with subpaths) wrapped in a single `WeekCalendar` adapter. Styled with Tailwind classes through its `*Class` options (v7 class names are obfuscated, so selectors on `.fc-*` are not an option), no FullCalendar themes and no CSS file. | Ships range selection by dragging, snapping, now indicator and move/resize out of the box. The adapter isolates the FC API from the rest of the app. | Own calendar (more code); react-big-calendar (no rich selection); v6 packages (separate `@fullcalendar/timegrid`, `/interaction`, `/core`) — **do not install**. |
 | D8 | **Motion with CSS only** (transitions, keyframes, `@starting-style`). | No dependencies; runs off the main thread; already specified in the *Motion system* board. | `motion`/framer-motion. |
 | D9 | **Tests with `node --test`** (Node 24 runs TypeScript natively) only for `domain/` and `server/`. | Zero dependencies; covers the highest-risk logic (parser, views, validation, ownership). | Vitest/Jest (new dependency); UI tests (out of scope). |
 | D10 | **Dark mode only.** `<html class="dark">` fixed, no toggle; the light theme block is removed. | Design requirement. | Theming with `next-themes` (the package is kept only because `components/ui/sonner.tsx` imports it; set `theme="dark"`). |
@@ -280,6 +280,7 @@ Rules: `staleTime` 60 s; `onError` → rollback + `toast.error`; no `invalidateQ
 
 ```ts
 type QuickAddApi = {
+  pending: { date: string; startMin: number; durationMin: number } | null;
   setPendingRange(r: { date: string; startMin: number; durationMin: number } | null): void;
   focus(): void;
 };
@@ -336,8 +337,7 @@ manage-my-tasks/
 │   │   │       └── day-aside.tsx      # Today's rhythm · Syntax
 │   │   └── calendar/
 │   │       ├── to-calendar-events.ts  to-calendar-events.test.ts
-│   │       ├── week-calendar.tsx      # FullCalendar adapter ("use client")
-│   │       └── week-calendar.css      # FC styles using tokens
+│   │       └── week-calendar.tsx      # FullCalendar adapter ("use client"); styled with Tailwind classes
 │   ├── components/
 │   │   ├── ui/                        # shadcn (vendored; edit only variants/classes)
 │   │   └── ds/                        # design system primitives (section 9.1)
@@ -516,45 +516,54 @@ Content below `QuickAdd` has `padding-bottom: 280px` so the last row is not cove
 
 | File | Responsibility |
 |---|---|
-| `to-calendar-events.ts` | `toCalendarEvents(tasks: Task[]): EventInput[]` (only `date && startMin !== null`; `start: "YYYY-MM-DDTHH:MM"`, `end` = start + `max(durationMin, 15)`; `classNames: ["bt-ev", "bt-ev--" + tint, done && "is-done"]`) and `fromRange(start: Date, end: Date): { date; startMin; durationMin }`. `tint` by tag: `study→ice`, `personal→moss`, `project→bone`, otherwise `neutral`. |
-| `week-calendar.tsx` | The single FullCalendar adapter (section 10). Exposes `<WeekCalendar />` with no FC props leaking out. |
-| `week-calendar.css` | FC styles using tokens (background `ground`, lines `#1F2420`, 30-minute slot with a fainter line, selection = dashed sodium border + 12% tint, events with the tints from the *Calendar flow* board, `is-done` = 50% opacity + strikethrough). |
+| `to-calendar-events.ts` | Pure data, no FullCalendar types. `toCalendarEvents(tasks): CalendarEvent[]` (only tasks with `date` and `startMin`; `start`/`end` as `"YYYY-MM-DDTHH:MM"` wall-clock strings, `end` = start + `max(durationMin, 15)`, rolling over midnight; `extendedProps: { tint, done }`; tint by tag: `study→ice`, `personal→moss`, `project→bone`, otherwise `neutral`) and `fromRange(start: Date, end: Date)`: `{ date, startMin, durationMin }` rounded to 5 min, a single 15 min slot becomes 60 min, never past midnight. |
+| `week-calendar.tsx` | The single FullCalendar adapter (section 10). Owns the week header (kicker with the ISO week, range title, planned time, ‹ Today ›). Exposes `<WeekCalendar />` with no FC props leaking out. |
 
 ---
 
 ## 10. FullCalendar v7 integration (exact)
 
-Install: `npm i --save-exact @fullcalendar/react@7.1.3 temporal-polyfill@1.0.6`. **Do not** install `@fullcalendar/core`, `@fullcalendar/timegrid` or `@fullcalendar/interaction` (those are v6).
+Install: `npm i --save-exact @fullcalendar/react@7.1.3 temporal-polyfill@1.0.6`. **Do not** install `@fullcalendar/core`, `@fullcalendar/timegrid` or `@fullcalendar/interaction` (those are v6; `@fullcalendar/core` 7.x arrives on its own as a dependency of `react`).
+
+What v7 does differently, and how this project deals with it:
+
+| v7 fact | Consequence |
+|---|---|
+| Internal class names are obfuscated (`.fc-rk`, `.fc-wY`…). | No CSS file and no `.fc-*` selectors. Everything is styled with Tailwind classes passed through the `*Class` options (`dayHeaderClass`, `slotLaneClass`, `dayLaneClass`, `highlightClass`, `columnEventClass`, `columnEventTitleClass`, `columnEventTimeClass`, `nowIndicatorLineClass`, `nowIndicatorDotClass`…). Tokens only, no hex. |
+| Without a theme plugin nothing sizes the event resizer; it is just the element in the `columnEventAfterClass` slot. | `columnEventAfterClass` returns `absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize` when `isEndResizable`. Without it events cannot be resized. |
+| `unselectAuto={false}` keeps the selection highlight over the grid. | `highlightClass` includes `pointer-events-none`, otherwise the highlight blocks dragging the events under it. |
+| The API comes from `useCalendarController()` (prev/next/today/getDate) and a `ref` (`getApi().select/unselect`). | The header buttons call the controller; a `useEffect` calls `unselect()` when `pending` becomes `null`. |
+| `start`/`end` in callbacks are `Date`, in local time. | `fromRange` reads local getters; nothing outside `to-calendar-events.ts` and `week-calendar.tsx` knows FullCalendar types. |
 
 ```tsx
-import FullCalendar from "@fullcalendar/react";
+import FullCalendar, { useCalendarController } from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/react/timegrid";
 import interactionPlugin from "@fullcalendar/react/interaction";
-import "@fullcalendar/react/skeleton.css";      // structure; no FC theme
-import "./week-calendar.css";
+import "@fullcalendar/react/skeleton.css";      // structure only; no theme
 
 <FullCalendar
+  ref={calendar} controller={controller}
   plugins={[timeGridPlugin, interactionPlugin]}
   initialView="timeGridWeek"
-  headerToolbar={false}            // the header is ours (range + ‹ Today ›) via calendarRef.getApi()
+  headerToolbar={false}            // the header is ours
   locale="en" firstDay={1}
   allDaySlot={false}
   slotMinTime="07:00:00" slotMaxTime="23:00:00"
   slotDuration="00:30:00" snapDuration="00:15:00"
+  height="auto" slotMinHeight={28}  // 56 px per hour; the page scrolls, not the calendar
+  slotEventOverlap={false}          // overlapping events sit side by side
+  eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+  slotHeaderFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
   nowIndicator
   selectable selectMirror unselectAuto={false}
-  editable eventDurationEditable eventStartEditable
+  editable eventStartEditable eventDurationEditable
   events={toCalendarEvents(tasks)}
-  select={(info) => { quickAdd.setPendingRange(fromRange(info.start, info.end)); quickAdd.focus(); }}
-  eventDrop={/* update(id, fromRange(start,end)) */}
-  eventResize={/* update(id, { durationMin }) */}
-  eventClick={/* toggle(id) */}
-  eventContent={/* title + mono time, from the board */}
-  height="auto"
+  select={(info) => { setPendingRange(fromRange(info.start, info.end)); focus(); }}
+  dateClick={(info) => api.select(info.date, info.date + 1 h)}   // a click creates a 1 h block
+  eventDrop={move} eventResize={move}      // update(id, fromRange(event.start, event.end))
+  eventClick={(info) => toggle(info.event.id)}
 />
 ```
-
-Behaviours: a click without dragging creates a 1 h block (default `selectMinDistance` + adjustment in `fromRange` if it lasts 15 min). Verify in the 7.1.3 types the exact shape of `info.start`/`info.end` (Date vs Temporal) **inside the adapter**; nothing outside `week-calendar.tsx` and `to-calendar-events.ts` knows FullCalendar types.
 
 ---
 
@@ -576,7 +585,7 @@ The task-by-task detail is in **`docs/SPEC.md`**; the design system is built the
 | Risk | Mitigation |
 |---|---|
 | FullCalendar 7.1.3 was published on 2026-10-16 (very recent). | Pin the exact version; if a blocking bug appears, go down to 7.1.2 (2026-10-12), never to v6. |
-| Styling FC without a theme may require internal selectors (`.fc-*`). | Everything in `week-calendar.css`; if a selector changes in a patch, only that file is touched. |
+| Styling FC without a theme means every visible part must be given classes. | All of it lives in `week-calendar.tsx`, through the documented `*Class` options (a stable API, unlike the obfuscated internals). |
 | The in-memory store is lost on restart. | Expected (2.2). The `TaskStore` seam is where the DB plugs in. |
 | `node --test` requires `.ts` in relative imports of `domain/`. | `allowImportingTsExtensions` in tsconfig; rule in section 6. |
 

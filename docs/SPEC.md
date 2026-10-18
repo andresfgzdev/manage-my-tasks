@@ -10,7 +10,7 @@
 
 1. **Closed scope.** Only create the files the task lists under *Files*. Nothing from [A§2.2].
 2. **No new dependencies**, except `@fullcalendar/react@7.1.3` and `temporal-polyfill@1.0.6` in T8.1. Always install with an exact version (`.npmrc` already has `save-exact=true`).
-3. **The design system is mandatory.** Every colour, radius, font, curve and animation comes from the tokens in T1.3. Forbidden in components: loose hex (`#…`), `rgb(…)`, Tailwind default-palette colours (`zinc-*`, `purple-*`, `emerald-*`…), `transition-all`, `ease-in`. The only exceptions are `globals.css`, `week-calendar.css` and opacities over tokens (`bg-sodium/10`).
+3. **The design system is mandatory.** Every colour, radius, font, curve and animation comes from the tokens in T1.3. Forbidden in components: loose hex (`#…`), `rgb(…)`, Tailwind default-palette colours (`zinc-*`, `purple-*`, `emerald-*`…), `transition-all`, `ease-in`. The only exception is `globals.css` (where the tokens are defined); opacities over tokens (`bg-sodium/10`) are fine.
 4. **Primitives before markup.** If a primitive in `components/ds/` exists for something (checkbox, chip, duration bar…), use it. Do not re-implement it inline.
 5. **No extra abstractions:** no barrels, no generic helpers, no hooks that merely wrap another hook, no "just in case" props. Props are exactly those in [A§9].
 6. **UI copy in English**, exactly as written in the tasks. Do not add Spanish strings anywhere.
@@ -285,21 +285,28 @@ All in `src/components/ds/`, client only if they have state/events. Exact classe
 ## Phase 8 — Week (calendar)
 
 ### T8.1 Install FullCalendar and the pure adapter
-- `npm i @fullcalendar/react@7.1.3 temporal-polyfill@1.0.6`.
-- **File:** `src/features/calendar/to-calendar-events.ts` + `to-calendar-events.test.ts`, interface [A§9.3]. Type `EventInput` locally as `{ id: string; title: string; start: string; end: string; classNames: string[] }` (do not import FC types here, so the test runs under `node --test`).
-- **Tests:** excludes tasks without `date`/`startMin`; `end` = start + `max(durationMin,15)`; tint by tag (`study`, `personal`, `project`, otherwise neutral); `is-done`; `fromRange` of 15 min → 60 min; a normal `fromRange` keeps the duration and rounds to 5 min.
+- `npm i @fullcalendar/react@7.1.3 temporal-polyfill@1.0.6` (exact; do not add `@fullcalendar/timegrid`, `/interaction` or `/core`).
+- **Files:** `src/features/calendar/to-calendar-events.ts` + `to-calendar-events.test.ts`, interface [A§9.3]. Output is plain data (`CalendarEvent` with `extendedProps: { tint, done }`), no FullCalendar types, so the test runs under `node --test`. Also add `isoWeek(iso)` to `time.ts` (with tests) for the "week N" kicker.
+- **Tests:** skips tasks without `date`/`startMin`; `end` = start + `max(durationMin,15)` and rolls past midnight to the next day; tint by tag (`study`, `personal`, `project`, otherwise neutral); `done` flag; `fromRange`: keeps a dragged duration, turns a single 15 min click into 60 min, rounds to 5 min, never runs past midnight; `isoWeek` against known dates (2026-10-17 is week 42; 2024-12-30 is week 1; 2021-01-03 is week 53).
+- Expose `pending` through `useQuickAdd()` (read-only) so the calendar knows when to clear its selection.
 
-### T8.2 `WeekCalendar` + styles
-- **Files:** `week-calendar.tsx` (client), `week-calendar.css`.
-- **Config:** exactly [A§10] (`locale="en"`, `firstDay={1}`). `eventDrop`/`eventResize` → `update(id, fromRange(start, end))`; `eventClick` → `toggle(id)`; `select` → `setPendingRange` + `focus`; register in the provider an `onCreated` that calls `calendarRef.current.getApi().unselect()`.
-- **Own header:** kicker "Better Tasks · week {n}", range title "Oct 12–18" (`text-[44px] font-semibold`), on the right the week's planned hours (`font-mono text-xs text-ash`, e.g. "21 h planned") + buttons ‹ / Today / › (`Button variant="outline"`, `lucide-react` icons `ChevronLeft/Right`, `aria-label` "Previous week" / "Next week"), which call `getApi().prev()/today()/next()`.
-- **CSS (`week-calendar.css`, using `var(--color-*)`):** background `ground`; hour lines `#1F2420` and half-hour lines `#181B19` (the only hex exceptions allowed; add them as `--cal-line` and `--cal-line-half` at the top of the file); today's column with a 2.5% sodium tint; day header: lowercase name `text-ash`, 22 px semibold number, today in sodium with a sodium bottom border; hours `font-mono 11px ash-dim`; events `border-radius:9px; padding:6px 8px` with tints: `--ice` `rgb(141 184 255 / .13)` border `.28`, `--moss` `rgb(143 203 155 / .13)` border `.28`, `--bone` `rgb(236 230 216 / .08)` border `.20`, `--neutral` `raise` border `#2E332F`; `.is-done` opacity .5 + strikethrough; selection mirror `1.5px dashed sodium` border + 12% sodium background; now indicator sodium 1.5 px with a 9 px dot; newly created event `animation: pop`.
-- **Acceptance (manual):** dragging a range shows the mirror and lights up QuickAdd with the range chip; typing "Study the Next.js course" + Enter creates the block (no tag → neutral tint; with `#study` → *ice* tint); dragging a block moves it; stretching its edge changes the duration; click marks it done.
+### T8.2 `WeekCalendar`
+- **File:** `week-calendar.tsx` (client). **No CSS file.** v7 obfuscates its internal class names, so it is styled only through its `*Class` options with Tailwind classes and tokens (see [A§10]).
+- **Config:** [A§10] exactly. `eventDrop`/`eventResize` → `update(id, fromRange(event.start, event.end))`; `eventClick` → `toggle(id)`; `select` → `setPendingRange` + `focus`; `dateClick` → `getApi().select(date, date + 1 h)`. A `useEffect` calls `getApi().unselect()` whenever `pending` becomes `null`, and clears `pending` on unmount.
+- **Own header** (above the grid, inside the component): kicker "Better Tasks · week {isoWeek}", range title ("Oct 12–18", or "Oct 26 – Nov 1" across months; `text-[44px] font-semibold`), the week's planned time (`font-mono text-xs text-ash`, e.g. "6 h 25 planned"), and `Button variant="outline"` controls ‹ / Today / › (`lucide-react` `ChevronLeft/Right`, `aria-label` "Previous week" / "Next week") calling the `CalendarController`. Each day header shows the weekday (lowercase), the number and that day's planned time.
+- **Classes (all tokens, no hex):**
+  - day header: `border-b bg-ground` (`bg-ground` because it is sticky), `border-sodium` today, `border-line` otherwise;
+  - slots: `border-t border-line/50`, minor slot `border-line/25`; day lanes `border-l border-line/50`, today `bg-sodium/[0.03]`; hour labels `font-mono text-[11px] text-ash-dim`;
+  - tints: `ice` = `border-ice/30 bg-ice/[0.13]`, `moss` = `border-moss/30 bg-moss/[0.13]`, `bone` = `border-bone/20 bg-bone/[0.08]`, `neutral` = `border-line bg-raise`; events `rounded-[9px] border px-2 py-1.5`; done = `opacity-50` + `line-through` title;
+  - selection (`highlightClass`) and mirror: `border-[1.5px] border-dashed border-sodium bg-sodium/[0.12]`, **with `pointer-events-none`** on the highlight;
+  - now indicator: `border-t-[1.5px] border-sodium` line and `size-[9px] rounded-full bg-sodium` dot;
+  - end resizer (`columnEventAfterClass`): `absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize` when `isEndResizable`.
+- **Acceptance (manual):** dragging a range shows the dashed block and lights up QuickAdd with the range chip; typing a title + Enter creates the task (tag `#study` gives the ice tint) and the block clears; dragging an event moves it; dragging its bottom edge changes the duration; clicking it marks it done; a click on an empty slot creates a 1 h block; Esc and the ✕ chip clear the selection; ‹ Today › navigate, including across months.
 
 ### T8.3 Week page
 - `week/page.tsx` → `<WeekCalendar />` (no `DayAside`).
 - Width: the `AppShell` container uses `max-w-[1120px]`, except on `/week`, where it uses `max-w-[1360px]` (`AppShell` decides with `usePathname()`; no new props).
-- The calendar's scroll area is `h-[640px]` and has `padding-bottom: 220px` so QuickAdd does not cover the last hour.
+- The calendar uses `height="auto"` (the page scrolls, not an inner box) and the component has `pb-[280px]` so QuickAdd does not cover the last hour.
 
 ---
 
