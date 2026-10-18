@@ -95,7 +95,7 @@
      const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
      // <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
      ```
-     `metadata.title = "Better Tasks"`. Remove Inter/Nunito and `data-lt-installed`.
+     `metadata.title = "Better Tasks"`. Remove Inter/Nunito and `data-lt-installed`, but **keep `suppressHydrationWarning` on `<body>`**: browser extensions (ColorZilla, Grammarly…) inject attributes into it before hydration and trigger a false hydration error.
   2. `package.json` → `"test": "node --test \"src/**/*.test.ts\""`.
   3. `sonner.tsx` → fixed `theme="dark"` (remove `useTheme`), `position="bottom-center"`, `offset={40}`, `toastOptions.classNames`: `toast: "bg-raise border border-line text-bone rounded-[12px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] font-sans"`, `actionButton: "!bg-transparent !text-sodium font-semibold"`, `description: "text-ash"`.
 - **Acceptance:** the HTML carries `class="dark …"` and both font variables; `npm test` runs (0 tests is fine).
@@ -271,12 +271,12 @@ All in `src/components/ds/`, client only if they have state/events. Exact classe
 ## Phase 7 — Open task
 
 ### T7.1 `SentenceToken`
-- **File:** `sentence-token.tsx` (client). Props: `label: string; children` (popover content). Trigger: `button` `px-0.5 border-b-[1.5px] border-dashed border-faint text-bone` (open: `border-solid border-sodium text-sodium-soft`). Content: `PopoverContent` from T1.5.
-- Editors inside (in the same file, not exported except the token): day (Today / Tomorrow / No date / `input type="date"`), time (`input type="time"` step 300), duration (buttons 15m/30m/45m/1h + `input type="range"` 5–240 step 5 + text "Ends HH:MM"), priority (4 buttons: None / Low / Medium / High), tag (`input`).
+- **File:** `sentence-token.tsx` (client). Props: `label: string; children`, where `children` is the popover content or a function `(close) => content`, so choice-style editors (day, priority, tag) can close the popover themselves. Trigger: `button` `px-0.5 border-b-[1.5px] border-dashed border-faint text-bone` (open: `border-solid border-sodium text-sodium-soft`). Content: `PopoverContent` from T1.5.
+- Editors in the same file, **exported by name** (`DayEditor`, `TimeEditor`, `DurationEditor`, `PriorityEditor`, `TagEditor`) because `TaskDetail` composes them inside a token. The tag input selects its text on focus: day (Today / Tomorrow / No date / `input type="date"`), time (`input type="time"` step 300), duration (buttons 15m/30m/45m/1h + `input type="range"` 5–240 step 5 + text "Ends HH:MM"), priority (4 buttons: None / Low / Medium / High), tag (`input`).
 
 ### T7.2 `TaskDetail`
 - **File:** `task-detail.tsx` (client). Mounted inside `TaskRow` when open (state in `DaySpine`: `openId`; one at a time; Esc closes).
-- **Layout (*Open task* board):** `ml-[66px] my-3 bg-surface border border-line rounded-[18px] px-8 py-7 flex flex-col gap-6 shadow-[0_24px_60px_rgb(0_0_0/0.45)]`, entrance `animate-row-in`. Title `input` `text-[28px] font-semibold tracking-[-0.02em] bg-transparent`. Sentence `text-[19px] leading-[1.9] text-ash`: "Do it {day} at {time}, for {duration}, with {priority} priority, tagged {#tag}." (omit empty clauses and show the token with text like "add time"). Steps: kicker "Steps · {done} of {total}" + `SegmentMeter` with one segment per step, each step with a small `Tick` (18 px via `className`) and text, input "Add a step and press Enter". Note: `textarea` `bg-ground border border-line rounded-row text-sm` with placeholder "Notes".
+- **Layout (*Open task* board):** `ml-[66px] my-3 bg-surface border border-line rounded-[18px] px-8 py-7 flex flex-col gap-6 shadow-[0_24px_60px_rgb(0_0_0/0.45)]`, entrance `animate-row-in`. Title `input` `text-[28px] font-semibold tracking-[-0.02em] bg-transparent`. Sentence `text-[19px] leading-[1.9] text-ash`: "Do it {day} at {time}, for {duration}, with {priority} priority, tagged {#tag}." (every clause is always shown; an empty one shows its token with placeholder text: "no date", "add time", "add duration", "no" priority, "add tag". Removing the day also clears the start time, and setting a time on an undated task sets its date to today). Steps: kicker "Steps · {done} of {total}" + `SegmentMeter` with one segment per step, each step with a small `Tick` (18 px via `className`) and text, input "Add a step and press Enter". Note: `textarea` `bg-ground border border-line rounded-row text-sm` with placeholder "Notes".
 - **Saving:** each change calls `update(id, patch)` on confirmation (blur/Enter/popover selection). No "Save" button.
 - **Do not:** modal; drawer; sharing or people; teasers.
 
