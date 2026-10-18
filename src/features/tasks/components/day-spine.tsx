@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { NowMarker } from "@/components/ds/now-marker";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
@@ -11,6 +12,7 @@ import { TaskRow } from "./task-row";
 export function DaySpine({ lens }: { lens: Lens }) {
   const now = useNow();
   const { tasks, isLoading, isError } = useTasks();
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const root = "min-w-0 flex-[999_1_560px] pb-[280px]";
 
@@ -52,7 +54,15 @@ export function DaySpine({ lens }: { lens: Lens }) {
             );
           }
           return (
-            <TaskRow key={item.task.id} task={item.task} overdue={item.overdue} index={rowIndex++} />
+            <TaskRow
+              key={item.task.id}
+              task={item.task}
+              overdue={item.overdue}
+              index={rowIndex++}
+              open={openId === item.task.id}
+              onOpen={() => setOpenId(item.task.id)}
+              onClose={() => setOpenId(null)}
+            />
           );
         })}
       </div>

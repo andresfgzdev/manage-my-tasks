@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useTaskActions } from "@/features/tasks/client/use-tasks";
 import type { Task } from "@/features/tasks/domain/task";
 import { formatDuration, formatHM } from "@/features/tasks/domain/time";
+import { TaskDetail } from "./task-detail";
 
 const FRESH_MS = 3000;
 
@@ -17,10 +18,16 @@ export function TaskRow({
   task,
   overdue,
   index,
+  open,
+  onOpen,
+  onClose,
 }: {
   task: Task;
   overdue: boolean;
   index: number;
+  open: boolean;
+  onOpen(): void;
+  onClose(): void;
 }) {
   const actions = useTaskActions();
 
@@ -29,6 +36,8 @@ export function TaskRow({
   // A fresh row that already has its real id replaced the optimistic one a
   // moment ago and was animated then: it must not fade in a second time.
   const animateEntry = !fresh || task.id.startsWith("tmp-");
+
+  if (open) return <TaskDetail task={task} onClose={onClose} />;
 
   return (
     <div
@@ -67,9 +76,12 @@ export function TaskRow({
 
         <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-2.5">
           <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <span
+            <button
+              type="button"
+              aria-expanded={false}
+              onClick={onOpen}
               className={cn(
-                "relative text-base font-medium break-words",
+                "relative cursor-pointer rounded-sm text-left text-base font-medium break-words focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none",
                 task.priority === 3 && "font-semibold",
                 task.done && "text-ash",
               )}
@@ -82,7 +94,7 @@ export function TaskRow({
                   task.done && "scale-x-100",
                 )}
               />
-            </span>
+            </button>
             {task.tag && <span className="font-mono text-xs text-ash">#{task.tag}</span>}
           </div>
           <div className="flex items-center gap-3">
