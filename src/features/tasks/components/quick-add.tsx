@@ -16,12 +16,12 @@ import { dayTitle, formatDuration, formatHM, toIsoDate } from "@/features/tasks/
 type Range = { date: string; startMin: number; durationMin: number };
 
 export type QuickAddApi = {
+  pending: Range | null;
   setPendingRange(range: Range | null): void;
   focus(): void;
 };
 
 type QuickAddState = QuickAddApi & {
-  pending: Range | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
 };
 
@@ -52,8 +52,8 @@ function useQuickAddState(): QuickAddState {
 }
 
 export function useQuickAdd(): QuickAddApi {
-  const { setPendingRange, focus } = useQuickAddState();
-  return { setPendingRange, focus };
+  const { pending, setPendingRange, focus } = useQuickAddState();
+  return { pending, setPendingRange, focus };
 }
 
 const KIND_LABEL: Record<LineTokenKind, string> = {
