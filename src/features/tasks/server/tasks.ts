@@ -1,4 +1,4 @@
-import { applyPatch, validateDraft, validatePatch } from "../domain/task.ts";
+import { applyPatch, newTask, validateDraft, validatePatch } from "../domain/task.ts";
 import type { Result, Task } from "../domain/task.ts";
 import type { TaskStore } from "./task-store.ts";
 
@@ -28,21 +28,7 @@ export function createTasksModule(deps: {
       const draft = validateDraft(input);
       if (!draft.ok) return draft;
 
-      const nowIso = deps.now().toISOString();
-      const task: Task = {
-        date: null,
-        startMin: null,
-        durationMin: 0,
-        priority: 0,
-        tags: [],
-        note: "",
-        ...draft.value,
-        id: deps.newId(),
-        done: false,
-        steps: [],
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      };
+      const task = newTask(draft.value, deps.newId(), deps.now().toISOString());
       await store.put(await deps.userId(), task);
       return { ok: true, value: task };
     },

@@ -8,10 +8,27 @@ export type SpineItem =
   | { type: "now"; label: string }
   | { type: "heading"; label: string };
 
+/** The lens a task belongs to. Unfinished tasks from earlier days stay on Today, as overdue. */
+export function lensOf(task: Pick<Task, "date" | "done">, today: string): Lens | null {
+  if (task.date === null) return "inbox";
+  if (task.date > today) return "next";
+  if (task.date === today || !task.done) return "today";
+  return null;
+}
+
 function inLens(task: Task, lens: Lens, today: string): boolean {
-  if (lens === "today") return task.date === today;
-  if (lens === "next") return task.date !== null && task.date > today;
-  return task.date === null;
+  return lensOf(task, today) === lens;
+}
+
+/** True once a timed block has ended before `nowMin`. */
+export function isLate(startMin: number, durationMin: number, nowMin: number): boolean {
+  return startMin + Math.max(durationMin, 0) < nowMin;
+}
+
+function isOverdue(task: Task, today: string, nowMin: number): boolean {
+  if (task.done || task.date === null || task.date > today) return false;
+  if (task.date < today) return true;
+  return task.startMin !== null && isLate(task.startMin, task.durationMin, nowMin);
 }
 
 function byCreated(a: Task, b: Task): number {
@@ -33,19 +50,16 @@ export function buildSpine(tasks: Task[], lens: Lens, today: string, nowMin: num
   const toItem = (task: Task): SpineItem => ({
     type: "task",
     task,
-    overdue:
-      lens === "today" &&
-      !task.done &&
-      task.startMin !== null &&
-      task.startMin + Math.max(task.durationMin, 0) < nowMin,
+    overdue: lens === "today" && isOverdue(task, today, nowMin),
   });
 
   const items: SpineItem[] = [];
   let nowPlaced = lens !== "today";
   const nowItem: SpineItem = { type: "now", label: formatHM(nowMin) };
 
+  // Tasks carried over from earlier days sort first (by date) and are always before now.
   for (const task of timed) {
-    if (!nowPlaced && (task.startMin as number) > nowMin) {
+    if (!nowPlaced && task.date === today && (task.startMin as number) > nowMin) {
       items.push(nowItem);
       nowPlaced = true;
     }
@@ -61,10 +75,10 @@ export function buildSpine(tasks: Task[], lens: Lens, today: string, nowMin: num
 }
 
 export function lensCounts(tasks: Task[], today: string): Record<Lens, number> {
-  const lenses: Lens[] = ["today", "next", "inbox"];
   const counts = { today: 0, next: 0, inbox: 0 };
-  for (const lens of lenses) {
-    counts[lens] = tasks.filter((t) => inLens(t, lens, today)).length;
+  for (const task of tasks) {
+    const lens = lensOf(task, today);
+    if (lens) counts[lens] += 1;
   }
   return counts;
 }
@@ -84,22 +98,6 @@ export function daySummary(
     focusLeftMin: day.filter((t) => !t.done).reduce((sum, t) => sum + t.durationMin, 0),
     segments: ordered.map((t) => t.done),
   };
-}
-
-/** Number of today's timed tasks overlapping each hour in [fromH, toH). */
-export function hourLoad(tasks: Task[], today: string, fromH: number, toH: number): number[] {
-  const timed = tasks.filter((t) => t.date === today && t.startMin !== null);
-  const loads: number[] = [];
-  for (let h = fromH; h < toH; h++) {
-    loads.push(
-      timed.filter((t) => {
-        const start = t.startMin as number;
-        const end = start + Math.max(t.durationMin, 15);
-        return start < (h + 1) * 60 && end > h * 60;
-      }).length,
-    );
-  }
-  return loads;
 }
 
 export function defaultDateFor(lens: Lens, today: string): string | null {

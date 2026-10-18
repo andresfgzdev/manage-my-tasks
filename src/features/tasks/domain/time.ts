@@ -40,6 +40,43 @@ export function dayTitle(d: Date): { name: string; num: string } {
   return { name: DAYS[d.getDay()], num: `${MONTHS[d.getMonth()]} ${d.getDate()}` };
 }
 
+/** `dayTitle` for a "YYYY-MM-DD" day, with no time zone in the way. */
+export function isoDayTitle(iso: string): { name: string; num: string } {
+  const d = parseIso(iso);
+  return { name: DAYS[d.getUTCDay()], num: `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}` };
+}
+
+/** Minutes past local midnight. */
+export function minuteOfDay(d: Date): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/** "today", "tomorrow", "Oct 20", or "no date". */
+export function relativeDay(date: string | null, today: string): string {
+  if (date === null) return "no date";
+  if (date === today) return "today";
+  if (date === addDays(today, 1)) return "tomorrow";
+  return isoDayTitle(date).num;
+}
+
+/** "Oct 12–18" inside one month, "Oct 26 – Nov 1" across two. */
+export function weekTitle(from: string, to: string): string {
+  const a = parseIso(from);
+  const b = parseIso(to);
+  return a.getUTCMonth() === b.getUTCMonth()
+    ? `${MONTHS[a.getUTCMonth()]} ${a.getUTCDate()}–${b.getUTCDate()}`
+    : `${isoDayTitle(from).num} – ${isoDayTitle(to).num}`;
+}
+
+/** "Wed 22 · 15:30 → 17:00 · 1 h 30", the label of a block picked on the calendar. */
+export function formatBlock(date: string, startMin: number, durationMin: number): string {
+  const d = parseIso(date);
+  const day = `${DAYS[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()}`;
+  return [day, formatRange(startMin, durationMin), formatDuration(durationMin)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function shiftOf(hour: number): "morning" | "afternoon" | "evening" {
   if (hour < 12) return "morning";
   if (hour < 19) return "afternoon";

@@ -111,3 +111,22 @@ test("parseLine collapses whitespace and rejects invalid durations", () => {
 test("parseLine crosses month boundaries for tomorrow", () => {
   assert.equal(parseLine("x tomorrow", "2026-12-31").date, "2027-01-01");
 });
+
+test("parseLine carries the end's am/pm over to a bare start", () => {
+  const lunch = parseLine("Lunch 1:30-3pm", TODAY);
+  assert.equal(lunch.startMin, 810);
+  assert.equal(lunch.durationMin, 90);
+  const late = parseLine("Party 10:00 to 11:00pm", TODAY);
+  assert.equal(late.startMin, 1320);
+  assert.equal(late.durationMin, 60);
+  // The same half of the day would end before it starts: the start is in the other half.
+  const meeting = parseLine("Meeting 11-1pm", TODAY);
+  assert.equal(meeting.startMin, 660);
+  assert.equal(meeting.durationMin, 120);
+  // A 24-hour start is left alone.
+  assert.equal(parseLine("Call 13:30-3pm", TODAY).startMin, 810);
+});
+
+test("parseLine keeps tags whose lowercase has combining marks", () => {
+  assert.deepEqual(parseLine("Trip #İstanbul", TODAY).tags, ["i̇stanbul"]);
+});

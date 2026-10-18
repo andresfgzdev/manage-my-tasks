@@ -26,9 +26,38 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 const MAX_TITLE = 200;
 const MAX_NOTE = 5000;
 const MAX_STEPS = 50;
-const MAX_TAGS = 8;
-const TAG_PATTERN = /^[\p{L}\d_-]{1,32}$/u;
+export const MAX_TAGS = 8;
+export const MAX_DURATION = 1440;
+// Marks (\p{M}) are allowed because lowercasing can produce them: "İ" → "i̇".
+const TAG_PATTERN = /^[\p{L}\p{M}\d_-]{1,32}$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Indexed by `Priority`. */
+export const PRIORITY_NAMES = ["none", "low", "medium", "high"] as const;
+
+/** "#Work" → "work"; null when it can't be a tag. The one tag rule for the Line, editors and server. */
+export function normalizeTag(raw: string): string | null {
+  const tag = raw.replace(/^#/, "").toLowerCase();
+  return TAG_PATTERN.test(tag) ? tag : null;
+}
+
+/** The task a draft becomes: the defaults live here for the server and the optimistic copy alike. */
+export function newTask(draft: TaskDraft, id: string, nowIso: string): Task {
+  return {
+    date: null,
+    startMin: null,
+    durationMin: 0,
+    priority: 0,
+    tags: [],
+    note: "",
+    ...draft,
+    id,
+    done: false,
+    steps: [],
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
 
 const DRAFT_KEYS = ["title", "date", "startMin", "durationMin", "priority", "tags", "note"];
 const PATCH_KEYS = [...DRAFT_KEYS, "done", "steps"];
@@ -86,7 +115,7 @@ const fieldValidators: Record<string, (v: unknown) => Result<unknown>> = {
     return { ok: true, value: v };
   },
   durationMin: (v) =>
-    isInt(v, 0, 1440) ? { ok: true, value: v } : fail("Invalid duration"),
+    isInt(v, 0, MAX_DURATION) ? { ok: true, value: v } : fail("Invalid duration"),
   priority: (v) =>
     isInt(v, 0, 3) ? { ok: true, value: v } : fail("Invalid priority"),
   tags: (v) => {
@@ -94,9 +123,9 @@ const fieldValidators: Record<string, (v: unknown) => Result<unknown>> = {
     if (v.length > MAX_TAGS) return fail(`Too many tags (max ${MAX_TAGS})`);
     const tags: string[] = [];
     for (const item of v) {
-      if (typeof item !== "string") return fail("Invalid tag");
-      const tag = item.toLowerCase();
-      if (!TAG_PATTERN.test(tag)) return fail("Invalid tag");
+      if (typeof item !== "string" || item.startsWith("#")) return fail("Invalid tag");
+      const tag = normalizeTag(item);
+      if (tag === null) return fail("Invalid tag");
       if (!tags.includes(tag)) tags.push(tag);
     }
     return { ok: true, value: tags };

@@ -1,8 +1,18 @@
 import { addDays, formatDuration, formatHM } from "./time.ts";
+import { MAX_TAGS, PRIORITY_NAMES, normalizeTag } from "./task.ts";
 import type { Priority } from "./task.ts";
 
 export type LineTokenKind = "time" | "duration" | "priority" | "tag" | "day";
 export type LineToken = { kind: LineTokenKind; label: string };
+
+/** The small word in front of a chip ("at 15:30", "lasts 45 min"), shared by the app and the landing. */
+export const TOKEN_KIND_LABELS: Record<LineTokenKind, string> = {
+  time: "at",
+  duration: "lasts",
+  priority: "priority",
+  tag: "tag",
+  day: "day",
+};
 
 export type ParsedLine = {
   title: string;
@@ -14,7 +24,6 @@ export type ParsedLine = {
   tokens: LineToken[];
 };
 
-const MAX_TAGS = 8;
 const TIME_24 = /^(\d{1,2}):(\d{2})$/;
 const TIME_12 = /^(\d{1,2})(?::(\d{2}))?(am|pm)$/i;
 const DURATION = /^~(\d+)(m|h)$/i;
@@ -26,8 +35,7 @@ const RANGE_WORDS = new Set(["to", "-", "–", "→", "until"]);
 const RANGE_JOINED = /^([^-–→]+)[-–→]([^-–→]+)$/;
 // A time word as typed, used to find mentions inside a title.
 const TIME_WORD = /(?<![\w:])\d{1,2}(?::\d{2})?(?:am|pm)?(?![\w:])/gi;
-
-const PRIORITY_LABELS = ["", "low", "medium", "high"];
+const MERIDIEM = /(am|pm)$/i;
 
 /** Minutes past midnight for "15:30", "3pm" or "3:30pm"; null when it is not a time. */
 export function readTime(word: string): number | null {
@@ -78,6 +86,23 @@ function rangeLength(start: number, end: number): number {
   return length === 0 ? 0 : length;
 }
 
+/** Start and end of "13:30 to 15:30"; the end's am/pm carries over to a bare start ("1:30-3pm"). */
+function readRange(fromWord: string, toWord: string): { from: number; to: number } | null {
+  const to = readTime(toWord);
+  if (to === null) return null;
+  let from = readTime(fromWord);
+  const suffix = toWord.match(MERIDIEM)?.[1].toLowerCase();
+  if (suffix && !MERIDIEM.test(fromWord)) {
+    const same = readTime(fromWord + suffix);
+    if (same !== null) {
+      // "11-1pm" means 11am to 1pm: the other half of the day when the same one would end first.
+      const other = readTime(fromWord + (suffix === "pm" ? "am" : "pm"));
+      from = same <= to || other === null ? same : other;
+    }
+  }
+  return from === null ? null : { from, to };
+}
+
 export function parseLine(text: string, today: string): ParsedLine {
   let startMin: number | null = null;
   let durationMin = 0;
@@ -95,32 +120,31 @@ export function parseLine(text: string, today: string): ParsedLine {
 
     if (startMin === null) {
       // "13:30-15:30" as one word, "13:30 to 15:30" as three, or a lone time.
+      // Times are kept in the title: the task shows them as a highlighted mention.
       const joined = word.match(RANGE_JOINED);
-      const from = joined ? readTime(joined[1]) : null;
-      const to = joined ? readTime(joined[2]) : null;
-      if (from !== null && to !== null) {
-        startMin = from;
-        rangeMin = rangeLength(from, to);
-      } else {
-        const alone = readTime(word);
-        if (alone !== null) {
-          startMin = alone;
-          const end = RANGE_WORDS.has(words[i + 1]?.toLowerCase() ?? "")
-            ? readTime(words[i + 2] ?? "")
-            : null;
-          if (end !== null) {
-            rangeMin = rangeLength(alone, end);
-            // The time stays in the title, so the end time and its joiner do too.
-            rest.push(word, words[i + 1], words[i + 2]);
-            i += 2;
-            tokens.push({ kind: "time", label: formatHM(startMin) });
-            continue;
-          }
-        }
-      }
-      if (startMin !== null) {
+      const spaced = !joined && RANGE_WORDS.has(words[i + 1]?.toLowerCase() ?? "");
+      const range = joined
+        ? readRange(joined[1], joined[2])
+        : spaced
+          ? readRange(word, words[i + 2] ?? "")
+          : null;
+      if (range) {
+        startMin = range.from;
+        rangeMin = rangeLength(range.from, range.to);
         tokens.push({ kind: "time", label: formatHM(startMin) });
-        // Times are kept in the title: the task shows them as a highlighted mention.
+        if (joined) {
+          rest.push(word);
+        } else {
+          // The end time and its joiner stay in the title too.
+          rest.push(word, words[i + 1], words[i + 2]);
+          i += 2;
+        }
+        continue;
+      }
+      const alone = readTime(word);
+      if (alone !== null) {
+        startMin = alone;
+        tokens.push({ kind: "time", label: formatHM(startMin) });
         rest.push(word);
         continue;
       }
@@ -137,14 +161,14 @@ export function parseLine(text: string, today: string): ParsedLine {
 
     if (priority === 0 && (match = word.match(PRIORITY))) {
       priority = match[1].length as Priority;
-      tokens.push({ kind: "priority", label: PRIORITY_LABELS[priority] });
+      tokens.push({ kind: "priority", label: PRIORITY_NAMES[priority] });
       continue;
     }
 
     if ((match = word.match(TAGS))) {
       for (const raw of match[1].split(",")) {
-        const tag = raw.replace(/^#/, "").toLowerCase();
-        if (tags.length >= MAX_TAGS || tags.includes(tag)) continue;
+        const tag = normalizeTag(raw);
+        if (tag === null || tags.length >= MAX_TAGS || tags.includes(tag)) continue;
         tags.push(tag);
         tokens.push({ kind: "tag", label: `#${tag}` });
       }

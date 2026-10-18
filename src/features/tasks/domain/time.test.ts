@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import {
   addDays,
   dayTitle,
+  formatBlock,
   formatDuration,
   formatHM,
+  isoDayTitle,
   isoWeek,
+  relativeDay,
   shiftOf,
   toIsoDate,
   weekRange,
+  weekTitle,
 } from "./time.ts";
 
 test("formatDuration", () => {
@@ -64,4 +68,25 @@ test("isoWeek follows ISO 8601", () => {
   assert.equal(isoWeek("2026-01-01"), 1);
   assert.equal(isoWeek("2024-12-30"), 1);
   assert.equal(isoWeek("2021-01-03"), 53);
+});
+
+test("isoDayTitle reads the day without a time zone", () => {
+  assert.deepEqual(isoDayTitle("2026-10-17"), { name: "Saturday", num: "Oct 17" });
+});
+
+test("relativeDay", () => {
+  assert.equal(relativeDay(null, "2026-10-17"), "no date");
+  assert.equal(relativeDay("2026-10-17", "2026-10-17"), "today");
+  assert.equal(relativeDay("2026-10-18", "2026-10-17"), "tomorrow");
+  assert.equal(relativeDay("2026-11-02", "2026-10-17"), "Nov 2");
+});
+
+test("weekTitle names the month once inside a month and twice across two", () => {
+  assert.equal(weekTitle("2026-10-12", "2026-10-18"), "Oct 12–18");
+  assert.equal(weekTitle("2026-10-26", "2026-11-01"), "Oct 26 – Nov 1");
+});
+
+test("formatBlock wraps past midnight", () => {
+  assert.equal(formatBlock("2026-10-21", 930, 90), "Wed 21 · 15:30 → 17:00 · 1 h 30");
+  assert.equal(formatBlock("2026-10-21", 1410, 60), "Wed 21 · 23:30 → 00:30 · 1 h");
 });

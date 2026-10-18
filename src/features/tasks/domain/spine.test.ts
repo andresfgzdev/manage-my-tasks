@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildSpine, daySummary, defaultDateFor, hourLoad, hourPlan, lensCounts } from "./spine.ts";
+import { buildSpine, daySummary, defaultDateFor, hourPlan, isLate, lensCounts, lensOf } from "./spine.ts";
 import type { SpineItem } from "./spine.ts";
 import type { Task } from "./task.ts";
 
@@ -106,8 +106,9 @@ test("lensCounts counts every task in each lens", () => {
     task({ date: "2026-11-01" }),
     task({ date: null }),
     task({ date: "2026-10-01" }),
+    task({ date: "2026-10-01", done: true }),
   ];
-  assert.deepEqual(lensCounts(tasks, TODAY), { today: 2, next: 2, inbox: 1 });
+  assert.deepEqual(lensCounts(tasks, TODAY), { today: 3, next: 2, inbox: 1 });
 });
 
 test("daySummary reports done, total, remaining focus and ordered segments", () => {
@@ -126,17 +127,6 @@ test("daySummary reports done, total, remaining focus and ordered segments", () 
   assert.deepEqual(daySummary([], TODAY), { done: 0, total: 0, focusLeftMin: 0, segments: [] });
 });
 
-test("hourLoad counts tasks overlapping each hour", () => {
-  const tasks = [
-    task({ startMin: 7 * 60 + 30, durationMin: 60 }),
-    task({ startMin: 8 * 60, durationMin: 0 }),
-    task({ startMin: null }),
-    task({ date: TOMORROW, startMin: 7 * 60, durationMin: 60 }),
-  ];
-  assert.deepEqual(hourLoad(tasks, TODAY, 7, 10), [1, 2, 0]);
-  assert.equal(hourLoad(tasks, TODAY, 7, 23).length, 16);
-});
-
 test("hourPlan sums the minutes each hour is booked", () => {
   const tasks = [
     task({ startMin: 7 * 60 + 30, durationMin: 60 }),
@@ -153,4 +143,25 @@ test("defaultDateFor", () => {
   assert.equal(defaultDateFor("today", TODAY), TODAY);
   assert.equal(defaultDateFor("next", TODAY), TOMORROW);
   assert.equal(defaultDateFor("inbox", TODAY), null);
+});
+
+test("unfinished tasks from earlier days stay on today as overdue, before now", () => {
+  const yesterday = task({ id: "y", date: "2026-10-16", startMin: 1080 });
+  const untimed = task({ id: "u", date: "2026-10-15" });
+  const finished = task({ id: "f", date: "2026-10-16", startMin: 600, done: true });
+  const later = task({ id: "l", startMin: 900 });
+  const items = buildSpine([yesterday, untimed, finished, later], "today", TODAY, 600);
+  assert.deepEqual(shape(items), ["y", "now:10:00", "l", "heading:Whenever", "u"]);
+  const overdue = items.flatMap((i) => (i.type === "task" && i.overdue ? [i.task.id] : []));
+  assert.deepEqual(overdue, ["y", "u"]);
+});
+
+test("lensOf and isLate", () => {
+  assert.equal(lensOf({ date: null, done: false }, TODAY), "inbox");
+  assert.equal(lensOf({ date: TOMORROW, done: true }, TODAY), "next");
+  assert.equal(lensOf({ date: TODAY, done: true }, TODAY), "today");
+  assert.equal(lensOf({ date: "2026-10-01", done: false }, TODAY), "today");
+  assert.equal(lensOf({ date: "2026-10-01", done: true }, TODAY), null);
+  assert.equal(isLate(480, 30, 511), true);
+  assert.equal(isLate(480, 30, 510), false);
 });
