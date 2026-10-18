@@ -1,3 +1,5 @@
+import { WeekCalendar } from "@/features/calendar/week-calendar";
+
 export default function WeekPage() {
-  return <h1>Week</h1>;
+  return <WeekCalendar />;
 }
