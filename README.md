@@ -1,119 +1,68 @@
 # Better Tasks
 
-A modern task management application designed to help you organize your daily tasks efficiently. Better Tasks provides an intuitive interface for managing your tasks, with powerful features for both individual and team productivity.
+A calm, keyboard-first planner for your day. You type a task in one line (`Review PR 15:30 ~45m !! #work`) and it lands on a timeline with its time, duration, priority and tags already set.
 
-## 🔐 Authentication & Security
+## Views
 
-Better Tasks leverages Clerk for robust authentication and security features:
+- **Today**: the day spine, a vertical timeline of today's tasks with a now marker, plus the tasks dated today without a time ("Whenever"). The side panel shows the hourly workload and the remaining focus time.
+- **Next**: what is coming after today.
+- **Inbox**: tasks without a date.
+- **Week**: a calendar. Drag across a range to create a block; drag a block to move it, or resize it to change how long it lasts.
 
-- **Authentication**: Secure user authentication with multiple sign-in methods
-- **Route Protection**: Protected routes ensuring data privacy
-- **Middleware**: Advanced middleware for request handling and validation
-- **Task Sharing**: Secure task sharing between users
-- **User Search**: Efficient user discovery and collaboration
+Open any task to edit it as a sentence (day, time, duration, priority, tags), add steps and a note. Tick it to complete it, and use the two-step button to delete it.
 
-## Live Demo & Repository
+## The Line
 
-[Live Demo](https://manage-my-tasks.vercel.app/)
+The Line is the floating input that creates tasks. Write the title and add any of these, in any order:
 
-[Repository](https://github.com/WalkerFGZ/manage-my-tasks)
+| Write | Means | Example |
+|---|---|---|
+| `15:30`, `3pm`, `3:30pm` | Starts at (the time stays in the title) | `Call mum 6pm` |
+| `13:30 to 15:30`, `1pm-3pm` | A time range: sets the start and the duration | `Workshop 9:00 to 11:30` |
+| `~45m`, `~2h` | Lasts | `Read ~2h` |
+| `!`, `!!`, `!!!` | Priority: low, medium, high | `Pay rent !!!` |
+| `#work`, `#work,home` | One or more tags (up to 8) | `Report #work` |
+| `today`, `tomorrow` | The day (a time alone also means today) | `run tomorrow 7:05` |
 
-## 📱 Application Preview
+A line with no day and no time goes to the Inbox.
 
-![Application Preview](./public/assets/demo_video.gif)
+## Running it
 
-## 🛠️ Tech Stack
+Requires Node.js 24 (the tests run the TypeScript sources directly with `node --test`).
 
-- **Framework**: Next.js
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui
-- **Animations**: Animated shadcn/ui
-- **State Management**: React Query
-- **Authentication**: Clerk
-- **Database**: Supabase
-- **Deployment**: Vercel
+```bash
+npm i
+npm run dev     # http://localhost:3000
+npm test        # domain and server tests (node --test)
+npm run lint
+npm run build
+```
 
-## 🚀 Features
+## Structure
 
-### Smart Task Management
+```
+src/
+  app/                 routes: landing, (app)/today|next|inbox|week, api/tasks
+  components/ds/       design system primitives
+  components/ui/       shadcn components adapted to the tokens
+  features/tasks/      domain (pure logic), server (store, route logic), client (data hooks), components
+  features/calendar/   the Week calendar (FullCalendar lives only here)
+  features/landing/    the landing page
+docs/
+  ARCHITECTURE.md      modules, decisions, design tokens and motion
+  SPEC.md              the V1 implementation plan
+```
 
-- Create, edit, and organize tasks effortlessly
-- Set priorities and due dates
-- Track progress in real-time
-- Categorize tasks with custom labels
-- Drag-and-drop task organization
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture.
 
-### Team Collaboration
+## Tech stack
 
-- Share tasks with team members
-- Real-time updates and notifications
-- Comment and discuss on tasks
-- Assign responsibilities
-- Team activity tracking
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui on Radix · TanStack Query · FullCalendar 7 · Temporal polyfill
 
-### Enhanced User Experience
+## Current limitations
 
-- Clean, intuitive interface
-- Dark/Light mode with persistence
-- Responsive design for all devices
-- Smooth animations and transitions
-- Keyboard shortcuts for power users
-- Toast notifications for feedback
-- Accessible components (ARIA)
-- Visual feedback for user actions
-- Dropdown menus and modals
-
-### Cross-Platform Compatibility
-
-- Mobile devices
-- Tablets
-- Laptops
-- Desktop screens
-
----
-
-## 📱 Responsive Design
-
-Better Tasks works perfectly on:
-
-- Mobile devices
-- Tablets
-- Laptops
-- Desktop screens
-
-## 🎨 UI/UX Features
-
-- Responsive design for all devices
-- Dark mode with persistence
-- Smooth animations and transitions
-- Accessible components (ARIA)
-- Visual feedback for user actions
-- Toast notifications
-- Dropdown menus and modals
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## 🙏 Acknowledgments
-
-- Next.js Team
-- Vercel
-- Clerk
-- Supabase
-- All contributors
-
-## 🔮 Future Roadmap / Ideas
-
-- Migrate to Clerk organizations
-- Mobile app development
-- Advanced analytics dashboard
-- Calendar integration
-- API documentation
-- Performance optimizations
-- Team workspaces
-- Custom themes
-- Export/Import functionality
+- **In-memory storage**: tasks live in the server's memory and are lost when it restarts. The `TaskStore` interface is where a database plugs in.
+- **No authentication**: everyone is the same demo user. `src/lib/session.ts` is the entry point for real auth.
+- Dark mode only, English only, no time zones, no recurring tasks, no notifications.
 
 Made with ❤️ by [Andres Gallego](https://github.com/WalkerFGZ)

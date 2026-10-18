@@ -42,3 +42,7 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+.env*.local
+
+# taste-skill working files
+.taste-skill/

@@ -1,0 +1,39 @@
+import "./globals.css";
+
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
+
+import type { Metadata } from "next";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  axes: ["opsz"],
+  display: "swap",
+});
+
+// Only the app uses the mono face: the landing must not wait for it.
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+  preload: false,
+});
+
+export const metadata: Metadata = {
+  title: "Better Tasks",
+  description:
+    "Better Tasks is a task management app that helps you manage your tasks efficiently.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
+      {/* Browser extensions inject attributes into <body> before hydration. */}
+      <body suppressHydrationWarning>{children}</body>
+    </html>
+  );
+}

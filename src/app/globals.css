@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* surfaces */
+  --color-ground: #0F1110;   /* app background */
+  --color-surface: #161917;  /* QuickAdd, open task, row hover */
+  --color-raise: #1D211E;    /* popovers, toast, neutral chips */
+  --color-line: #2A2F2B;     /* borders, spine, separators */
+  /* ink */
+  --color-bone: #ECE6D8;     /* primary text */
+  --color-ash: #9A9C92;      /* secondary text (>= 4.5:1 on ground) */
+  --color-ash-dim: #8A8D85;  /* small mono metadata (>= 4.5:1) */
+  --color-faint: #5E625B;    /* decoration / borders only, never text */
+  /* signals */
+  --color-sodium: #FF9A3C;       /* now, focus, primary action */
+  --color-sodium-soft: #FFB872;  /* text on a sodium tint */
+  --color-moss: #8FCB9B;         /* done; personal category */
+  --color-ice: #8DB8FF;          /* study category */
+  --color-ember: #E5484D;        /* delete */
+  --color-ember-soft: #F2777A;   /* delete text on raise or an ember tint */
+
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-chip: 7px;
+  --radius-control: 10px;
+  --radius-row: 12px;
+  --radius-panel: 18px;
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);     /* entrances, chips, toast */
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1); /* view indicator */
+
+  --animate-row-in: row-in 320ms var(--ease-out-strong) both;
+  --animate-chip-in: chip-in 180ms var(--ease-out-strong) both;
+  --animate-wash: wash 1400ms ease-out both;
+  --animate-pop: pop 520ms var(--ease-out-strong) both;
+  --animate-view-in: view-in 320ms var(--ease-out-strong) both;
+  --animate-rise: rise 420ms var(--ease-out-strong) both;
+  --animate-fade-in: fade-in 200ms ease-out both;
+  --animate-menu-in: menu-in 140ms var(--ease-out-strong) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+}
+
+/* shadcn: its semantic variables point at the palette (dark only) */
+:root {
+  color-scheme: dark;
+  --radius: 0.75rem;
+  --background: var(--color-ground);   --foreground: var(--color-bone);
+  --card: var(--color-surface);        --card-foreground: var(--color-bone);
+  --popover: var(--color-raise);       --popover-foreground: var(--color-bone);
+  --primary: var(--color-sodium);      --primary-foreground: var(--color-ground);
+  --secondary: var(--color-raise);     --secondary-foreground: var(--color-bone);
+  --muted: var(--color-raise);         --muted-foreground: var(--color-ash);
+  --accent: var(--color-raise);        --accent-foreground: var(--color-bone);
+  --destructive: var(--color-ember);
+  --border: var(--color-line);         --input: var(--color-line);   --ring: var(--color-sodium);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(2px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wash {
+  from { opacity: 0.16; }
+  to { opacity: 0; }
+}
+@keyframes pop {
+  from { transform: scale(0.97); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-sodium) 70%, transparent); }
+  to { transform: none; box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+/* A ring that grows and fades: transform and opacity only, so it never repaints the page. */
+@keyframes now-ring {
+  0% { transform: scale(1); opacity: 0.35; }
+  70%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+@utility press {
+  transition: transform 140ms var(--ease-out-strong);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ash);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    /* Reserve the scrollbar so short and tall views have the same width. */
+    scrollbar-gutter: stable;
+    scrollbar-color: var(--color-line) transparent;
+  }
+  body {
+    @apply bg-ground text-bone font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    position: relative;
+  }
+  /* Ambient backdrop: a dot grid that fades out from the top, plus two soft
+     glows. One fixed layer, painted once: no animation, no layout cost. */
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  body::before {
+    background:
+      radial-gradient(60rem 28rem at 50% -8%, color-mix(in srgb, var(--color-sodium) 11%, transparent), transparent 70%),
+      radial-gradient(44rem 26rem at 100% 100%, color-mix(in srgb, var(--color-ice) 7%, transparent), transparent 70%);
+  }
+  body::after {
+    background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-bone) 13%, transparent) 1px, transparent 0) 0 0 / 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+    mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+  }
+}
+
+/* Interactive surfaces share one fast, GPU-only feel. */
+@utility lift {
+  transition: transform 160ms var(--ease-out-strong), box-shadow 160ms var(--ease-out-strong), background-color 160ms, border-color 160ms;
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    &:hover {
+      transform: translateY(-1px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  /* No displacement at all: pressed controls keep their size. */
+  .press:active {
+    transform: none;
+  }
+}
