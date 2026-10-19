@@ -11,7 +11,7 @@ function task(over: Partial<Task>): Task {
     startMin: 930,
     durationMin: 90,
     priority: 0,
-    tag: null,
+    tags: [],
     done: false,
     steps: [],
     note: "",
@@ -50,11 +50,11 @@ test("toCalendarEvents rolls an end past midnight over to the next day", () => {
 
 test("toCalendarEvents picks the tint from the tag", () => {
   const tints = toCalendarEvents([
-    task({ id: "s", tag: "study" }),
-    task({ id: "p", tag: "personal" }),
-    task({ id: "j", tag: "project" }),
-    task({ id: "w", tag: "work" }),
-    task({ id: "n", tag: null }),
+    task({ id: "s", tags: ["study"] }),
+    task({ id: "p", tags: ["personal"] }),
+    task({ id: "j", tags: ["project"] }),
+    task({ id: "w", tags: ["work"] }),
+    task({ id: "n", tags: [] }),
   ]).map((e) => e.extendedProps.tint);
   assert.deepEqual(tints, ["ice", "moss", "bone", "neutral", "neutral"]);
 });

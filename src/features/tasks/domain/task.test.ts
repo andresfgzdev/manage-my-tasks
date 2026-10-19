@@ -10,7 +10,7 @@ const base: Task = {
   startMin: 600,
   durationMin: 30,
   priority: 1,
-  tag: "work",
+  tags: ["work"],
   done: false,
   steps: [],
   note: "",
@@ -22,9 +22,9 @@ test("validateDraft accepts a minimal draft", () => {
   assert.deepEqual(validateDraft({ title: "x" }), { ok: true, value: { title: "x" } });
 });
 
-test("validateDraft trims the title and lowercases the tag", () => {
-  const res = validateDraft({ title: "  Hello  ", tag: "Work" });
-  assert.deepEqual(res, { ok: true, value: { title: "Hello", tag: "work" } });
+test("validateDraft trims the title and lowercases and dedupes tags", () => {
+  const res = validateDraft({ title: "  Hello  ", tags: ["Work", "work", "home"] });
+  assert.deepEqual(res, { ok: true, value: { title: "Hello", tags: ["work", "home"] } });
 });
 
 test("validateDraft rejects an empty or missing title", () => {
@@ -46,7 +46,7 @@ test("validateDraft rejects out-of-range and malformed values", () => {
   assert.equal(validateDraft({ title: "x", durationMin: 1.5 }).ok, false);
   assert.equal(validateDraft({ title: "x", priority: 4 }).ok, false);
   assert.equal(validateDraft({ title: "x", date: "2026-02-30" }).ok, false);
-  assert.equal(validateDraft({ title: "x", tag: "#work" }).ok, false);
+  assert.equal(validateDraft({ title: "x", tags: ["#work"] }).ok, false);
   assert.equal(validateDraft({ title: "x", note: "n".repeat(5001) }).ok, false);
   assert.equal(validateDraft({ title: "x".repeat(201) }).ok, false);
 });

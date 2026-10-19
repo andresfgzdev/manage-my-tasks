@@ -20,6 +20,11 @@ function wallClock(date: string, min: number): string {
   return min >= 1440 ? `${addDays(date, 1)}T${formatHM(min - 1440)}` : `${date}T${formatHM(min)}`;
 }
 
+function tintOf(tags: string[]): Tint {
+  for (const tag of tags) if (TINTS[tag]) return TINTS[tag];
+  return "neutral";
+}
+
 export function toCalendarEvents(tasks: Task[]): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   for (const task of tasks) {
@@ -29,7 +34,7 @@ export function toCalendarEvents(tasks: Task[]): CalendarEvent[] {
       title: task.title,
       start: wallClock(task.date, task.startMin),
       end: wallClock(task.date, task.startMin + Math.max(task.durationMin, 15)),
-      extendedProps: { tint: TINTS[task.tag ?? ""] ?? "neutral", done: task.done },
+      extendedProps: { tint: tintOf(task.tags), done: task.done },
     });
   }
   return events;

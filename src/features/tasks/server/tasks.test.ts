@@ -27,7 +27,7 @@ test("create returns a full task with defaults", async () => {
       startMin: null,
       durationMin: 0,
       priority: 0,
-      tag: null,
+      tags: [],
       done: false,
       steps: [],
       note: "",
@@ -45,13 +45,13 @@ test("create keeps the fields of a valid draft", async () => {
     startMin: 930,
     durationMin: 45,
     priority: 2,
-    tag: "Work",
+    tags: ["Work"],
   });
   assert.equal(res.ok, true);
   if (res.ok) {
     assert.equal(res.value.startMin, 930);
     assert.equal(res.value.priority, 2);
-    assert.equal(res.value.tag, "work");
+    assert.deepEqual(res.value.tags, ["work"]);
   }
 });
 

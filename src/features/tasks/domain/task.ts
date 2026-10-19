@@ -8,7 +8,7 @@ export type Task = {
   startMin: number | null;
   durationMin: number;
   priority: Priority;
-  tag: string | null;
+  tags: string[];
   done: boolean;
   steps: Step[];
   note: string;
@@ -17,7 +17,7 @@ export type Task = {
 };
 
 export type TaskDraft = { title: string } & Partial<
-  Pick<Task, "date" | "startMin" | "durationMin" | "priority" | "tag" | "note">
+  Pick<Task, "date" | "startMin" | "durationMin" | "priority" | "tags" | "note">
 >;
 export type TaskPatch = Partial<Omit<Task, "id" | "createdAt" | "updatedAt">>;
 
@@ -26,10 +26,11 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 const MAX_TITLE = 200;
 const MAX_NOTE = 5000;
 const MAX_STEPS = 50;
+const MAX_TAGS = 8;
 const TAG_PATTERN = /^[\p{L}\d_-]{1,32}$/u;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const DRAFT_KEYS = ["title", "date", "startMin", "durationMin", "priority", "tag", "note"];
+const DRAFT_KEYS = ["title", "date", "startMin", "durationMin", "priority", "tags", "note"];
 const PATCH_KEYS = [...DRAFT_KEYS, "done", "steps"];
 
 const fail = <T>(error: string): Result<T> => ({ ok: false, error });
@@ -88,11 +89,17 @@ const fieldValidators: Record<string, (v: unknown) => Result<unknown>> = {
     isInt(v, 0, 1440) ? { ok: true, value: v } : fail("Invalid duration"),
   priority: (v) =>
     isInt(v, 0, 3) ? { ok: true, value: v } : fail("Invalid priority"),
-  tag: (v) => {
-    if (v === null) return { ok: true, value: null };
-    if (typeof v !== "string") return fail("Invalid tag");
-    const tag = v.toLowerCase();
-    return TAG_PATTERN.test(tag) ? { ok: true, value: tag } : fail("Invalid tag");
+  tags: (v) => {
+    if (!Array.isArray(v)) return fail("Invalid tags");
+    if (v.length > MAX_TAGS) return fail(`Too many tags (max ${MAX_TAGS})`);
+    const tags: string[] = [];
+    for (const item of v) {
+      if (typeof item !== "string") return fail("Invalid tag");
+      const tag = item.toLowerCase();
+      if (!TAG_PATTERN.test(tag)) return fail("Invalid tag");
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+    return { ok: true, value: tags };
   },
   done: (v) => (typeof v === "boolean" ? { ok: true, value: v } : fail("Invalid done flag")),
   steps: validateSteps,

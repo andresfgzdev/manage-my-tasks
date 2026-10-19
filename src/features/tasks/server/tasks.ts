@@ -34,7 +34,7 @@ export function createTasksModule(deps: {
         startMin: null,
         durationMin: 0,
         priority: 0,
-        tag: null,
+        tags: [],
         note: "",
         ...draft.value,
         id: deps.newId(),
