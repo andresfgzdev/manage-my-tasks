@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { House, LogOut } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -31,6 +31,7 @@ export function AccountButton({ user }: { user: AccountUser }) {
         menu.open({ kind: "box", rect: e.currentTarget.getBoundingClientRect() }, [
           { type: "heading", title: user.name, detail: user.email },
           { type: "separator" },
+          { type: "action", label: "Home page", icon: <House />, run: () => router.push("/") },
           { type: "action", label: "Sign out", icon: <LogOut />, run: signOut },
         ])
       }

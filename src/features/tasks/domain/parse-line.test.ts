@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseLine, removeTimeMention, splitTimeMentions } from "./parse-line.ts";
+import { parseLine, removeTimeMention, setLineWord, splitTimeMentions } from "./parse-line.ts";
 
 const TODAY = "2026-10-17";
 
@@ -129,4 +129,16 @@ test("parseLine carries the end's am/pm over to a bare start", () => {
 
 test("parseLine keeps tags whose lowercase has combining marks", () => {
   assert.deepEqual(parseLine("Trip #İstanbul", TODAY).tags, ["i̇stanbul"]);
+});
+
+test("setLineWord replaces or removes one kind of word", () => {
+  assert.equal(setLineWord("call mum", "time", "15:30"), "call mum 15:30 ");
+  assert.equal(setLineWord("call mum 3pm", "time", "16:00"), "call mum 16:00 ");
+  assert.equal(setLineWord("meet 13:30 to 15:30 #work", "time", "9:00"), "meet #work 9:00 ");
+  assert.equal(setLineWord("meet 13:30-15:30", "time", null), "meet ");
+  assert.equal(setLineWord("read ~2h", "duration", "~30m"), "read ~30m ");
+  assert.equal(setLineWord("fix bug !! now", "priority", "!!!"), "fix bug now !!! ");
+  assert.equal(setLineWord("fix bug !", "priority", null), "fix bug ");
+  assert.equal(setLineWord("run today", "day", "tomorrow"), "run tomorrow ");
+  assert.equal(setLineWord("today", "day", null), "");
 });

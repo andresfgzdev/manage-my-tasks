@@ -1,16 +1,18 @@
 "use client";
 
-import { CalendarDays, Inbox, Plus, Sun, SunMedium } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { CalendarDays, House, Inbox, Plus, Sun, SunMedium } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { useAppMenu } from "@/components/ds/app-menu";
 import type { MenuItem } from "@/components/ds/app-menu";
 import { LensTabs } from "@/components/ds/lens-tabs";
 import { AccountButton } from "@/features/auth/components/account-button";
 import type { AccountUser } from "@/features/auth/components/account-button";
+import { ThemeToggle } from "@/features/theme/theme-toggle";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { lensCounts } from "@/features/tasks/domain/spine";
+import { RhythmSheet } from "./day-aside";
 import { DayHeader } from "./day-header";
 import { useQuickAdd } from "./quick-add";
 
@@ -20,6 +22,7 @@ const warmWeek = () => import("@/features/calendar/week-calendar");
 
 export function AppShell({ user, children }: { user: AccountUser; children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const now = useNow();
   const { tasks } = useTasks();
   const menu = useAppMenu();
@@ -48,15 +51,17 @@ export function AppShell({ user, children }: { user: AccountUser; children: Reac
       { type: "action", label: "Next", icon: <SunMedium />, run: go("/next") },
       { type: "action", label: "Inbox", icon: <Inbox />, run: go("/inbox") },
       { type: "action", label: "Week", icon: <CalendarDays />, run: go("/week") },
+      { type: "separator" },
+      { type: "action", label: "Home page", icon: <House />, run: go("/") },
     ];
     e.preventDefault();
     menu.open({ kind: "point", x: e.clientX, y: e.clientY }, items);
   };
 
   return (
-    <div className="min-h-dvh px-6 pt-10 max-sm:px-4" onContextMenu={onContextMenu}>
+    <div data-app-shell className="min-h-dvh px-6 pt-10 max-sm:px-4" onContextMenu={onContextMenu}>
       {/* One width for every view: switching tabs never moves the header or the tabs. */}
-      <div className="mx-auto flex max-w-[1360px] flex-col gap-7">
+      <div className="mx-auto flex max-w-(--content-width) flex-col gap-7">
         <div className="animate-rise" style={{ animationDelay: "0ms" }}>
           <DayHeader />
         </div>
@@ -65,6 +70,9 @@ export function AppShell({ user, children }: { user: AccountUser; children: Reac
           <div className="min-w-0 flex-1">
             <LensTabs items={tabs} />
           </div>
+          {/* Below lg the Today sidebar is a sheet; this opens it. */}
+          {pathname === "/today" && <RhythmSheet />}
+          <ThemeToggle />
           <AccountButton user={user} />
         </div>
         {/* The view's own entrance lives in (app)/template.tsx: one animation, not two. */}

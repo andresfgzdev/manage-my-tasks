@@ -80,6 +80,44 @@ export function removeTimeMention(title: string, index: number): string {
     .trim();
 }
 
+export type PickableKind = Exclude<LineTokenKind, "tag">;
+
+/** Where the parser would read the start time: the first range (one or three words) or lone time. */
+function findTime(words: string[]): { at: number; count: number } | null {
+  for (let i = 0; i < words.length; i++) {
+    const joined = words[i].match(RANGE_JOINED);
+    if (joined && readRange(joined[1], joined[2])) return { at: i, count: 1 };
+    if (RANGE_WORDS.has(words[i + 1]?.toLowerCase() ?? "") && readRange(words[i], words[i + 2] ?? "")) {
+      return { at: i, count: 3 };
+    }
+    if (readTime(words[i]) !== null) return { at: i, count: 1 };
+  }
+  return null;
+}
+
+const KIND_PATTERNS: Record<Exclude<PickableKind, "time">, RegExp> = {
+  duration: DURATION,
+  priority: PRIORITY,
+  day: DAY,
+};
+
+/**
+ * The Line with its `kind` word replaced by `word` (or taken out, for null): the
+ * touch pickers edit the text, so the text stays the one thing the parser reads.
+ * The result ends in a space, ready for the next word.
+ */
+export function setLineWord(text: string, kind: PickableKind, word: string | null): string {
+  let words = text.split(/\s+/).filter(Boolean);
+  if (kind === "time") {
+    const found = findTime(words);
+    if (found) words.splice(found.at, found.count);
+  } else {
+    words = words.filter((w) => !KIND_PATTERNS[kind].test(w));
+  }
+  if (word) words.push(word);
+  return words.length === 0 ? "" : `${words.join(" ")} `;
+}
+
 /** Length in minutes of an end time after a start, wrapping past midnight. */
 function rangeLength(start: number, end: number): number {
   const length = (end - start + 1440) % 1440;

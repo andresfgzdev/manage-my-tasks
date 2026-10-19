@@ -2,7 +2,8 @@ import "./globals.css";
 
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { THEME_SCRIPT } from "@/features/theme/theme-script";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -25,13 +26,20 @@ export const metadata: Metadata = {
     "Better Tasks is a task management app that helps you manage your tasks efficiently.",
 };
 
+// Android shrinks the page under its keyboard, so the Line stays above it.
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`}>
+    // The theme script may swap "dark" for "light" before hydration.
+    <html lang="en" className={`dark ${dmSans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       {/* Browser extensions inject attributes into <body> before hydration. */}
       <body suppressHydrationWarning>{children}</body>
     </html>

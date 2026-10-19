@@ -35,7 +35,7 @@ export function TaskEditorProvider({ children }: { children: React.ReactNode }) 
           <Dialog.Overlay className="fixed inset-0 z-50 bg-ground/70 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed top-1/2 left-1/2 z-50 w-[min(520px,calc(100%-32px))] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-line bg-surface p-6 shadow-[0_30px_80px_rgb(0_0_0/0.6)] outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-200"
+            className="fixed top-1/2 left-1/2 z-50 w-[min(520px,calc(100%-32px))] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-line bg-surface p-6 shadow-[0_30px_80px_color-mix(in_srgb,var(--color-shade)_60%,transparent)] outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-200"
           >
             {task && <EditForm key={task.id} task={task} onDone={() => setId(null)} />}
           </Dialog.Content>

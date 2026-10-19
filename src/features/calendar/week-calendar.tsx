@@ -50,7 +50,7 @@ const dayLaneClass = ({ isToday }: ClassArg<"isToday">) =>
 type EventArg = { event: { extendedProps: Record<string, unknown> }; isMirror?: boolean };
 const columnEventClass = ({ event, isMirror }: EventArg) =>
   cn(
-    "animate-fade-in cursor-pointer overflow-hidden rounded-[9px] border px-2 py-1.5 transition-[opacity,filter,box-shadow] duration-150 hover:brightness-125 hover:shadow-[0_6px_18px_rgb(0_0_0/0.35)]",
+    "animate-fade-in cursor-pointer overflow-hidden rounded-[9px] border px-2 py-1.5 transition-[opacity,filter,box-shadow] duration-150 hover:brightness-125 hover:shadow-[0_6px_18px_color-mix(in_srgb,var(--color-shade)_35%,transparent)]",
     isMirror
       ? "border-[1.5px] border-dashed border-sodium bg-sodium/[0.12]"
       : TINT_CLASSES[(event.extendedProps.tint as Tint) ?? "neutral"],

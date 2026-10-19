@@ -15,6 +15,7 @@ import { formatDuration, formatHM, formatRange } from "@/features/tasks/domain/t
 import { useTaskEditor } from "./task-editor";
 import { useTaskMenu } from "./task-menu";
 import { TaskDetail } from "./task-detail";
+import { TaskExtras } from "./task-extras";
 
 const FRESH_MS = 3000;
 const LEAVE_MS = 220;
@@ -199,6 +200,7 @@ export const TaskRow = memo(function TaskRow({
                   </button>
                 )}
                 <PriorityBars priority={task.priority} />
+                <TaskExtras task={task} onOpen={() => onOpen(task.id)} />
               </div>
             </div>
 

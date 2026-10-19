@@ -231,6 +231,9 @@
 .bt-tile--say { grid-column: span 4; }
 .bt-tile--say p { font-size: var(--step-statement); line-height: 1.25; letter-spacing: -0.01em; max-width: 22ch; }
 .bt-tile--say small { font-size: var(--step-small); color: var(--muted); }
+.bt-heart { color: #b5560a; }
+.bt-credit { color: var(--ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ink) 30%, transparent); text-underline-offset: 3px; transition: text-decoration-color 160ms; }
+.bt-credit:hover { text-decoration-color: var(--accent); }
 .bt-tile--nav { grid-column: span 3; justify-content: flex-start; gap: 6px; }
 .bt-tile--nav a { font-size: var(--step-body); padding: 3px 0; transition: transform 160ms var(--ease-out); }
 .bt-tile--nav a:hover { transform: translateX(4px); }
