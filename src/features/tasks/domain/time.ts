@@ -61,3 +61,10 @@ export function isoWeek(iso: string): number {
   const diffDays = (thursday.getTime() - firstThursday.getTime()) / 86400000;
   return 1 + Math.round((diffDays - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
 }
+
+/** "13:30 → 15:30" for a start and a length; just the start when there is no length. */
+export function formatRange(startMin: number, durationMin: number): string {
+  return durationMin > 0
+    ? `${formatHM(startMin)} → ${formatHM((startMin + durationMin) % 1440)}`
+    : formatHM(startMin);
+}
