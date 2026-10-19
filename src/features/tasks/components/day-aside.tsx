@@ -1,14 +1,16 @@
 "use client";
 
-import { CircleHelp } from "lucide-react";
-import { useMemo } from "react";
-import { PriorityBars } from "@/components/ds/priority-bars";
+import { CircleHelp, PanelRight, X } from "lucide-react";
+import { Dialog } from "radix-ui";
+import { useMemo, useRef, useState } from "react";
+import { Credits } from "@/components/ds/credits";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { hourPlan } from "@/features/tasks/domain/spine";
 import { formatDuration, formatHM } from "@/features/tasks/domain/time";
+import { LineGuide } from "./line-guide";
 import { useQuickAdd } from "./quick-add";
 
 const FROM_HOUR = 7;
@@ -119,109 +121,28 @@ function Rhythm() {
   );
 }
 
-const SYNTAX: {
-  tokens: string[];
-  name: string;
-  hint: string;
-  detail: string;
-  extra?: React.ReactNode;
-}[] = [
-  {
-    tokens: ["15:30", "3pm"],
-    name: "Starts at",
-    hint: "The start time",
-    detail: "Sets when it starts and keeps the time in the text. A range works too: 13:30 to 15:30.",
-  },
-  {
-    tokens: ["~45m", "~2h"],
-    name: "Lasts",
-    hint: "How long it takes",
-    detail: "Write ~ then minutes or hours. A range like 13:30 to 15:30 sets the duration for you.",
-  },
-  {
-    tokens: ["!", "!!", "!!!"],
-    name: "Priority",
-    hint: "Low, medium or high",
-    detail: "One, two or three exclamation marks.",
-    extra: <PriorityBars priority={2} />,
-  },
-  {
-    tokens: ["#work,home"],
-    name: "Tags",
-    hint: "One or more tags",
-    detail: "Separate several tags with commas: #work,home makes two tags.",
-  },
-  {
-    tokens: ["today", "tomorrow"],
-    name: "Day",
-    hint: "When to do it",
-    detail: "Without a day, it goes to the view you are on.",
-  },
-];
-
-const EXAMPLE = "Review PR 15:30 ~45m !! #work";
-
-function LineSyntax() {
-  const { insert } = useQuickAdd();
-
+function GuideCard({ onPick }: { onPick?(): void }) {
   return (
-    <section className="flex flex-col">
-      <div className="flex items-center justify-between pb-1">
-        <h2 className="kicker">How to write a task</h2>
-        <Help>Type these anywhere in the Line, in any order. Click a row to add it.</Help>
-      </div>
-      <p className="pb-2.5 text-[12px] leading-snug text-ash-dim">
-        Add them anywhere in the Line. Click one to insert it.
-      </p>
-
-      {SYNTAX.map((row) => (
-        <Tooltip key={row.name}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => insert(`${row.tokens[0]} `)}
-              className="press group/row -mx-2 flex items-start justify-between gap-3 rounded-[9px] border-b border-raise px-2 py-2 text-left text-[13px] transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none"
-            >
-              <span className="flex flex-wrap gap-1">
-                {row.tokens.map((token) => (
-                  <code
-                    key={token}
-                    className="rounded-chip border border-line bg-raise px-1.5 py-0.5 font-mono text-[12px] text-bone transition-colors group-hover/row:border-sodium/40"
-                  >
-                    {token}
-                  </code>
-                ))}
-              </span>
-              <span className="flex items-center gap-2 text-right text-ash">
-                {row.extra}
-                {row.name}
-              </span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-[260px] text-[12px] leading-snug">
-            <strong className="font-semibold">{row.hint}.</strong> {row.detail}
-          </TooltipContent>
-        </Tooltip>
-      ))}
-
+    <LineGuide onPick={onPick}>
       <button
         type="button"
-        onClick={() => insert(`${EXAMPLE} `)}
-        className="press mt-3 flex flex-col items-start gap-1 rounded-[10px] border border-dashed border-line px-3 py-2.5 text-left transition-colors hover:border-sodium/50 hover:bg-surface focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none"
+        className="press group/guide flex items-center gap-3 rounded-[12px] border border-dashed border-line px-3.5 py-3 text-left transition-colors hover:border-sodium/50 hover:bg-surface focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none"
       >
-        <span className="kicker">Try an example</span>
-        <span className="font-mono text-[12px] text-bone">{EXAMPLE}</span>
-        <span className="text-[11px] text-ash-dim">
-          Today at 15:30, for 45 min, medium priority, tagged #work.
+        <span className="grid size-8 shrink-0 place-items-center rounded-[9px] border border-line bg-raise font-mono text-[13px] text-sodium transition-colors group-hover/guide:border-sodium/40">
+          ›_
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[13px] font-medium text-bone">How to write a task</span>
+          <span className="truncate font-mono text-[11px] text-ash-dim">15:30 ~45m !! #work tomorrow</span>
         </span>
       </button>
-    </section>
+    </LineGuide>
   );
 }
 
-export function DayAside() {
+function AsideContent({ onPick }: { onPick?(): void }) {
   return (
-    <aside className="flex min-w-0 flex-[1_1_260px] flex-col gap-8 pt-2">
+    <>
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="kicker">Today&apos;s rhythm</h2>
@@ -233,7 +154,69 @@ export function DayAside() {
         <Rhythm />
       </section>
 
-      <LineSyntax />
+      <GuideCard onPick={onPick} />
+      <Credits className="mt-auto" />
+    </>
+  );
+}
+
+/** The Today sidebar, from lg up. Below that it moves into RhythmSheet. */
+export function DayAside() {
+  return (
+    <aside className="sticky top-8 hidden w-[280px] shrink-0 flex-col gap-7 self-start pt-2 lg:flex">
+      <AsideContent />
     </aside>
+  );
+}
+
+/** Tablet and phone: the same sidebar slides in from the right instead of falling under the list. */
+export function RhythmSheet() {
+  const { focus } = useQuickAdd();
+  const [open, setOpen] = useState(false);
+  // A line picked from the guide closes the sheet too, and focus goes to the Line.
+  const picked = useRef(false);
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Today's rhythm"
+          title="Today's rhythm"
+          className="press grid size-9 shrink-0 place-items-center rounded-full border border-line bg-raise text-ash transition-colors hover:border-faint hover:text-bone focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none lg:hidden"
+        >
+          <PanelRight className="size-[17px]" />
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-ground/60 backdrop-blur-[2px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onCloseAutoFocus={(e) => {
+            if (!picked.current) return;
+            e.preventDefault();
+            picked.current = false;
+            focus();
+          }}
+          className="fixed inset-y-0 right-0 z-50 flex w-[min(340px,calc(100%-48px))] flex-col gap-7 overflow-y-auto border-l border-line bg-ground px-6 pt-6 pb-[calc(24px+env(safe-area-inset-bottom))] shadow-[-24px_0_60px_color-mix(in_srgb,var(--color-shade)_45%,transparent)] outline-none data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=closed]:ease-in data-[state=closed]:slide-out-to-right data-[state=open]:animate-in data-[state=open]:duration-300 data-[state=open]:ease-out-strong data-[state=open]:slide-in-from-right"
+        >
+          <div className="flex items-center justify-between">
+            <Dialog.Title className="text-lg font-semibold">Your day</Dialog.Title>
+            <Dialog.Close
+              aria-label="Close"
+              className="press grid size-8 place-items-center rounded-full text-ash transition-colors hover:bg-raise hover:text-bone focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none"
+            >
+              <X className="size-4" />
+            </Dialog.Close>
+          </div>
+          <AsideContent
+            onPick={() => {
+              picked.current = true;
+              setOpen(false);
+            }}
+          />
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

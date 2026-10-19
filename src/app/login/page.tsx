@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Credits } from "@/components/ds/credits";
 import { LoginForm } from "@/features/auth/components/login-form";
 import { safeNext } from "@/features/auth/safe-next";
 import { getCurrentUser } from "@/lib/session";
@@ -31,6 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           Better Tasks
         </Link>
         <LoginForm next={next} notice={noticeFor(search)} />
+        <Credits className="self-center" />
       </div>
     </main>
   );

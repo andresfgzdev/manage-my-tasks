@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { SegmentMeter } from "@/components/ds/segment-meter";
 import { daySummary } from "@/features/tasks/domain/spine";
 import { dayTitle, formatDuration, shiftOf } from "@/features/tasks/domain/time";
@@ -20,7 +22,20 @@ export function DayHeader() {
   return (
     <header className="flex flex-wrap items-end justify-between gap-6">
       <div className="flex flex-col gap-1.5">
-        <span className="kicker">Better Tasks · {shiftOf(Math.floor(now.minute / 60))} shift</span>
+        <span className="kicker">
+          {/* The way back to the landing: the arrow shows on hover. */}
+          <Link
+            href="/"
+            className="group/home -ml-0.5 inline-flex items-center gap-1 rounded-sm transition-colors hover:text-bone focus-visible:ring-2 focus-visible:ring-sodium/60 focus-visible:outline-none"
+          >
+            <ArrowLeft
+              aria-hidden="true"
+              className="size-3 -translate-x-1 opacity-0 transition-[transform,opacity] duration-200 ease-out-strong group-hover/home:translate-x-0 group-hover/home:opacity-100 group-focus-visible/home:translate-x-0 group-focus-visible/home:opacity-100 max-sm:translate-x-0 max-sm:opacity-100"
+            />
+            Better Tasks
+          </Link>{" "}
+          · {shiftOf(Math.floor(now.minute / 60))} shift
+        </span>
         <h1 className="text-[56px] leading-none font-semibold tracking-[-0.03em] max-sm:text-[40px]">
           {name} <span className="font-normal text-ash">{num}</span>
         </h1>

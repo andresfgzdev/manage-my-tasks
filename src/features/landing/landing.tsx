@@ -127,7 +127,10 @@ export function Landing() {
       <footer className="bt-foot">
         <div className="bt-tile bt-tile--say" data-reveal>
           <p>A task manager that reads one line and puts it on your day.</p>
-          <small>© 2026 Better Tasks</small>
+          <small>
+            © 2026 Better Tasks · Made with <span className="bt-heart" role="img" aria-label="love">♥</span> by{" "}
+            <a href="https://github.com/andresfgzdev" target="_blank" rel="noreferrer" className="bt-credit">Andres Gallego</a>
+          </small>
         </div>
         <nav className="bt-tile bt-tile--nav" aria-label="App" data-reveal>
           <Link href="/today">Today</Link>
