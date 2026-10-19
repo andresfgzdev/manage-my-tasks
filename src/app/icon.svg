@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Better Tasks: the day's spine, two tasks on it, and the sodium "now" marker. -->
+  <rect width="32" height="32" rx="8" fill="#0F1110"/>
+  <rect x="9" y="5" width="2" height="22" rx="1" fill="#3A403B"/>
+  <rect x="15" y="7.5" width="11" height="3" rx="1.5" fill="#ECE6D8"/>
+  <rect x="15" y="21.5" width="7" height="3" rx="1.5" fill="#8A8D85"/>
+  <rect x="10" y="14.5" width="17" height="3" rx="1.5" fill="#FF9A3C"/>
+  <circle cx="10" cy="16" r="6.5" fill="#FF9A3C" fill-opacity="0.22"/>
+  <circle cx="10" cy="16" r="4" fill="#FF9A3C"/>
+</svg>
