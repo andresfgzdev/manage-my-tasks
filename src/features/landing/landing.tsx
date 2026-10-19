@@ -3,6 +3,7 @@ import { HeroLine } from "./hero-line";
 import { How } from "./how";
 import { LocalTime, Reveal } from "./motion";
 import { PanelNotes } from "./panel-notes";
+import { FootSession, NavSession } from "./session-nav";
 import { Views } from "./views";
 import "./landing.css";
 
@@ -54,7 +55,7 @@ export function Landing() {
           <a href="#questions">Questions</a>
         </nav>
         <div className="bt-nav__act">
-          <Link href={LOGIN_HREF} className="bt-nav__login">Log in</Link>
+          <NavSession loginHref={LOGIN_HREF} appHref={APP_HREF} />
           <Link href={APP_HREF} className="bt-btn bt-btn--small">Open the app</Link>
         </div>
       </header>
@@ -142,8 +143,7 @@ export function Landing() {
           <LocalTime />
         </div>
         <div className="bt-tile bt-tile--login" data-reveal>
-          <span>Already have tasks?</span>
-          <Link href={LOGIN_HREF} className="bt-tile__link">Log in</Link>
+          <FootSession loginHref={LOGIN_HREF} appHref={APP_HREF} />
         </div>
         <div className="bt-tile bt-tile--mark" aria-hidden data-reveal>Better Tasks</div>
         <Link href={APP_HREF} className="bt-tile bt-tile--go" data-reveal>
