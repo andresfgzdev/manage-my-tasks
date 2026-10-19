@@ -138,7 +138,7 @@ function MenuSurface({ menu, onClose }: { menu: OpenMenu; onClose(): void }) {
       }}
       onContextMenu={(e) => e.preventDefault()}
       style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? "visible" : "hidden" }}
-      className="fixed z-[100] max-w-[300px] min-w-[220px] origin-top-left animate-menu-in rounded-[14px] border border-line bg-raise/95 p-1.5 shadow-[0_18px_44px_rgb(0_0_0/0.55)] backdrop-blur-md"
+      className="fixed z-[100] max-w-[300px] min-w-[220px] origin-top-left animate-menu-in rounded-[14px] border border-line bg-raise/95 p-1.5 shadow-[0_18px_44px_color-mix(in_srgb,var(--color-shade)_55%,transparent)] backdrop-blur-md"
     >
       {menu.items.map((item, i) => {
         if (item.type === "separator") {

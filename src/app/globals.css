@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
 
 @theme {
   /* surfaces */
@@ -44,9 +45,31 @@
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
-/* shadcn: its semantic variables point at the palette (dark only) */
+/* Day shift: the same roles on paper. Only the tokens change, so every
+   component follows; <html> gets .light from the theme script before paint. */
+:root.light {
+  color-scheme: light;
+  --color-ground: #F3F1EA;
+  --color-surface: #FBFAF6;
+  --color-raise: #E9E6DD;
+  --color-line: #D9D5CA;
+  --color-bone: #1A1C1A;
+  --color-ash: #56584F;      /* >= 4.5:1 on ground */
+  --color-ash-dim: #64665E;  /* >= 4.5:1 on ground */
+  --color-faint: #B4B0A5;
+  --color-sodium: #D9650C;
+  --color-sodium-soft: #9C4706;
+  --color-moss: #3E8A52;
+  --color-ice: #3568BF;
+  --color-ember: #D13A3F;
+  --color-ember-soft: #B12A2F;
+  --color-shade: rgb(74 58 32 / 0.32);
+}
+
+/* shadcn: its semantic variables point at the palette */
 :root {
   color-scheme: dark;
+  --color-shade: #000; /* shadows: always mixed with transparent, never painted solid */
   --radius: 0.75rem;
   --background: var(--color-ground);   --foreground: var(--color-bone);
   --card: var(--color-surface);        --card-foreground: var(--color-bone);
@@ -146,6 +169,7 @@
     @apply border-border outline-ring/50;
   }
   html {
+    --content-width: 1360px;
     /* Reserve the scrollbar so short and tall views have the same width. */
     scrollbar-gutter: stable;
     scrollbar-color: var(--color-line) transparent;
@@ -175,6 +199,39 @@
     -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
     mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
   }
+  /* In the app the dots stay in the margins: the content column reads on a calm
+     ground, and the grid only shows where nothing needs reading. */
+  body:has([data-app-shell])::after {
+    --clear: calc(var(--content-width) / 2 + 24px);
+    --gutter-fade: linear-gradient(
+      to right,
+      #000 calc(50% - var(--clear) - 96px),
+      transparent calc(50% - var(--clear)),
+      transparent calc(50% + var(--clear)),
+      #000 calc(50% + var(--clear) + 96px)
+    );
+    -webkit-mask-image: var(--gutter-fade), radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: var(--gutter-fade), radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+    mask-composite: intersect;
+  }
+}
+
+/* Theme switch: the browser snapshots both themes and we wipe the new one in
+   over the old (theme-toggle.tsx drives the clip-path). The defaults would
+   cross-fade, which reads as a flicker, so they are turned off here. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+/* While the snapshots are taken, nothing may animate its colours on its own. */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
 }
 
 /* Interactive surfaces share one fast, GPU-only feel. */

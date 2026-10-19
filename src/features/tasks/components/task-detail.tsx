@@ -58,7 +58,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
         // Radix marks Escape as handled when it closes a popover: don't close the card too.
         if (e.key === "Escape" && !e.defaultPrevented) close();
       }}
-      className="relative my-3 ml-[66px] flex animate-row-in flex-col gap-6 rounded-[18px] border border-line bg-surface px-8 py-7 shadow-[0_24px_60px_rgb(0_0_0/0.45)] max-sm:ml-10 max-sm:px-4 max-sm:py-5"
+      className="relative my-3 ml-[66px] flex animate-row-in flex-col gap-6 rounded-[18px] border border-line bg-surface px-8 py-7 shadow-[0_24px_60px_color-mix(in_srgb,var(--color-shade)_45%,transparent)] max-sm:ml-10 max-sm:px-4 max-sm:py-5"
     >
       <span
         aria-hidden="true"
