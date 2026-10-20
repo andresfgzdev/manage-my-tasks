@@ -1,16 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useMemo } from "react";
 import type { Task, TaskDraft, TaskPatch } from "@/features/tasks/domain/task";
 import { tasksApi } from "./tasks-api";
 
 const KEY = ["tasks"] as const;
 const NO_TASKS: Task[] = [];
-const UNDO_MS = 4000;
 const TEMP_PREFIX = "tmp-";
 
-const byCreated = (a: Task, b: Task) => (a.createdAt < b.createdAt ? -1 : 1);
+export const TASKS_KEY = KEY;
 
 export function useTasks(): { tasks: Task[]; isLoading: boolean; isError: boolean } {
   const { data, isLoading, isError } = useQuery({ queryKey: KEY, queryFn: tasksApi.list });
@@ -21,6 +20,7 @@ export function useTaskActions(): {
   create(draft: TaskDraft): void;
   update(id: string, patch: TaskPatch): void;
   toggle(id: string): void;
+  duplicate(id: string): void;
   remove(id: string): void;
 } {
   const queryClient = useQueryClient();
@@ -31,8 +31,6 @@ export function useTaskActions(): {
   const replace = (id: string, task: Task) =>
     setTasks((all) => all.map((t) => (t.id === id ? task : t)));
   const resync = () => queryClient.invalidateQueries({ queryKey: KEY });
-  const reportFailure = (message: string, error: unknown) =>
-    toast.error(message, { description: error instanceof Error ? error.message : undefined });
 
   const createMutation = useMutation({
     mutationFn: ({ draft }: { draft: TaskDraft; tempId: string }) => tasksApi.create(draft),
@@ -46,7 +44,7 @@ export function useTaskActions(): {
           startMin: null,
           durationMin: 0,
           priority: 0,
-          tag: null,
+          tags: [],
           note: "",
           ...draft,
           id: tempId,
@@ -58,9 +56,9 @@ export function useTaskActions(): {
       ]);
     },
     onSuccess: (task, { tempId }) => replace(tempId, task),
-    onError: (error, { tempId }) => {
+    // A failed write rolls back and resyncs: the UI itself is the feedback.
+    onError: (_error, { tempId }) => {
       setTasks((all) => all.filter((t) => t.id !== tempId));
-      reportFailure("Couldn't create the task", error);
       resync();
     },
   });
@@ -74,9 +72,8 @@ export function useTaskActions(): {
       return { previous };
     },
     onSuccess: (task) => replace(task.id, task),
-    onError: (error, { id }, context) => {
+    onError: (_error, { id }, context) => {
       if (context?.previous) replace(id, context.previous);
-      reportFailure("Couldn't save the change", error);
       resync();
     },
   });
@@ -85,61 +82,43 @@ export function useTaskActions(): {
   // the window is a few milliseconds and the server does not know that id yet.
   const isTemporary = (id: string) => id.startsWith(TEMP_PREFIX);
 
-  const update = (id: string, patch: TaskPatch) => {
-    if (!isTemporary(id)) updateMutation.mutate({ id, patch });
-  };
+  const { mutate: create } = createMutation;
+  const { mutate: save } = updateMutation;
 
-  return {
-    create: (draft) =>
-      createMutation.mutate({ draft, tempId: `${TEMP_PREFIX}${crypto.randomUUID()}` }),
+  // Stable identity: memoised rows depend on it.
+  return useMemo(() => {
+    const update = (id: string, patch: TaskPatch) => {
+      if (!isTemporary(id)) save({ id, patch });
+    };
+    return {
+      create: (draft: TaskDraft) =>
+        create({ draft, tempId: `${TEMP_PREFIX}${crypto.randomUUID()}` }),
 
-    update,
+      update,
 
-    toggle: (id) => {
-      const task = find(id);
-      if (!task || isTemporary(id)) return;
-      const done = !task.done;
-      update(id, { done });
-      if (done) {
-        toast("Done", {
-          description: task.title,
-          duration: UNDO_MS,
-          action: { label: "Undo", onClick: () => update(id, { done: false }) },
+      toggle: (id: string) => {
+        const task = find(id);
+        if (task && !isTemporary(id)) update(id, { done: !task.done });
+      },
+
+      duplicate: (id: string) => {
+        const task = find(id);
+        if (!task || isTemporary(id)) return;
+        const { title, date, startMin, durationMin, priority, tags, note } = task;
+        create({
+          draft: { title, date, startMin, durationMin, priority, tags: [...tags], note },
+          tempId: `${TEMP_PREFIX}${crypto.randomUUID()}`,
         });
-      }
-    },
+      },
 
-    // Optimistic: the task leaves the cache now and the DELETE only reaches the
-    // server after UNDO_MS, unless the user undoes it. The timer is not tied to
-    // the component, so it survives the row unmounting.
-    remove: (id) => {
-      const task = find(id);
-      if (!task || isTemporary(id)) return;
-      setTasks((all) => all.filter((t) => t.id !== id));
-      const restore = () =>
-        setTasks((all) => (all.some((t) => t.id === id) ? all : [...all, task].sort(byCreated)));
-
-      const timer = setTimeout(async () => {
-        try {
-          await tasksApi.remove(id);
-        } catch (error) {
-          restore();
-          reportFailure("Couldn't delete the task", error);
-          resync();
-        }
-      }, UNDO_MS);
-
-      toast("Deleted", {
-        description: task.title,
-        duration: UNDO_MS,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            clearTimeout(timer);
-            restore();
-          },
-        },
-      });
-    },
-  };
+      // Optimistic: the task leaves the cache now. If the server refuses, it
+      // comes back on the resync.
+      remove: (id: string) => {
+        if (isTemporary(id) || !find(id)) return;
+        setTasks((all) => all.filter((t) => t.id !== id));
+        tasksApi.remove(id).catch(resync);
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient, create, save]);
 }

@@ -4,17 +4,18 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import type { Metadata } from "next";
 import { Providers } from "./providers";
-import { Toaster } from "@/components/ui/sonner";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
   axes: ["opsz"],
+  display: "swap",
 });
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +34,6 @@ export default function RootLayout({
       {/* Browser extensions inject attributes into <body> before hydration. */}
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
-        <Toaster />
       </body>
     </html>
   );
