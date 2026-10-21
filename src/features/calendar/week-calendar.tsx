@@ -11,12 +11,16 @@ import type {
 import interactionPlugin from "@fullcalendar/react/interaction";
 import timeGridPlugin from "@fullcalendar/react/timegrid";
 import "@fullcalendar/react/skeleton.css";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
+import { useAppMenu } from "@/components/ds/app-menu";
+import type { MenuItem } from "@/components/ds/app-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTaskActions, useTasks } from "@/features/tasks/client/use-tasks";
 import { useQuickAdd } from "@/features/tasks/components/quick-add";
+import { useTaskEditor } from "@/features/tasks/components/task-editor";
+import { useTaskMenu } from "@/features/tasks/components/task-menu";
 import { dayTitle, formatDuration, isoWeek, toIsoDate, weekRange } from "@/features/tasks/domain/time";
 import { fromRange, toCalendarEvents } from "./to-calendar-events";
 import type { Tint } from "./to-calendar-events";
@@ -47,6 +51,9 @@ export function WeekCalendar() {
   const { tasks } = useTasks();
   const actions = useTaskActions();
   const { pending, setPendingRange, focus } = useQuickAdd();
+  const menu = useAppMenu();
+  const taskMenu = useTaskMenu();
+  const editor = useTaskEditor();
 
   const events = useMemo(() => toCalendarEvents(tasks), [tasks]);
 
@@ -77,8 +84,26 @@ export function WeekCalendar() {
     actions.update(event.id, fromRange(event.start, event.end ?? new Date(event.start.getTime() + 900000)));
   };
 
+  // Right click: on a block it offers that task's actions, elsewhere the week's.
+  const openContextMenu = (e: React.MouseEvent) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-event-id]");
+    const task = el ? tasks.find((t) => t.id === el.dataset.eventId) : undefined;
+    const items: MenuItem[] = task
+      ? taskMenu(task, () => editor.edit(task.id))
+      : [
+          { type: "action", label: "New task", icon: <Plus />, run: focus },
+          { type: "separator" },
+          { type: "action", label: "Today", icon: <CalendarDays />, run: () => controller.today() },
+          { type: "action", label: "Previous week", icon: <ChevronLeft />, run: () => controller.prev() },
+          { type: "action", label: "Next week", icon: <ChevronRight />, run: () => controller.next() },
+        ];
+    e.preventDefault();
+    e.stopPropagation();
+    menu.open({ kind: "point", x: e.clientX, y: e.clientY }, items);
+  };
+
   return (
-    <div className="min-w-0 flex-1 pb-[280px]">
+    <div className="min-w-0 flex-1 pb-[280px]" onContextMenu={openContextMenu}>
       <header className="flex flex-wrap items-end justify-between gap-5 pb-5">
         <div className="flex flex-col gap-1.5">
           <span className="kicker">Better Tasks · week {isoWeek(range.from)}</span>
@@ -133,7 +158,19 @@ export function WeekCalendar() {
         }
         eventDrop={move}
         eventResize={move}
-        eventClick={(info: EventClickInfo) => actions.toggle(info.event.id)}
+        eventDidMount={({ el, event }) => {
+          el.dataset.eventId = event.id;
+        }}
+        eventClick={(info: EventClickInfo) => {
+          // A click opens the block's actions; it never completes the task.
+          const task = tasks.find((t) => t.id === info.event.id);
+          if (task) {
+            menu.open(
+              { kind: "box", rect: info.el.getBoundingClientRect() },
+              taskMenu(task, () => editor.edit(task.id)),
+            );
+          }
+        }}
         slotHeaderFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         dayHeaderContent={(info) => (
           <div className="flex items-baseline gap-2 px-2.5 pt-2 pb-2.5">
@@ -162,7 +199,7 @@ export function WeekCalendar() {
         highlightClass="pointer-events-none rounded-[9px] border-[1.5px] border-dashed border-sodium bg-sodium/[0.12]"
         columnEventClass={({ event, isMirror }) =>
           cn(
-            "cursor-pointer overflow-hidden rounded-[9px] border px-2 py-1.5 transition-[opacity,filter] duration-150",
+            "animate-fade-in cursor-pointer overflow-hidden rounded-[9px] border px-2 py-1.5 transition-[opacity,filter,box-shadow] duration-150 hover:brightness-125 hover:shadow-[0_6px_18px_rgb(0_0_0/0.35)]",
             isMirror
               ? "border-[1.5px] border-dashed border-sodium bg-sodium/[0.12]"
               : TINT_CLASSES[(event.extendedProps.tint as Tint) ?? "neutral"],

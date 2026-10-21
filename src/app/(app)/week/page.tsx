@@ -1,5 +1,5 @@
-import { WeekCalendar } from "@/features/calendar/week-calendar";
+import { WeekView } from "@/features/calendar/week-view";
 
 export default function WeekPage() {
-  return <WeekCalendar />;
+  return <WeekView />;
 }
