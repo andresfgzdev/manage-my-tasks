@@ -133,12 +133,12 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose(): void }) {
               )}
             </SentenceToken>{" "}
             priority, tagged{" "}
-            <SentenceToken label={task.tag ? `#${task.tag}` : "add tag"}>
+            <SentenceToken label={task.tags.length ? task.tags.map((t) => `#${t}`).join(" ") : "add tags"}>
               {(closePopover) => (
                 <TagEditor
-                  tag={task.tag}
+                  tags={task.tags}
                   close={closePopover}
-                  onChange={(tag) => actions.update(task.id, { tag })}
+                  onChange={(tags) => actions.update(task.id, { tags })}
                 />
               )}
             </SentenceToken>

@@ -6,8 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import type { Priority } from "@/features/tasks/domain/task";
 import { addDays, formatDuration, formatHM } from "@/features/tasks/domain/time";
+import { parseTags } from "./tag-input";
 
-const TAG_PATTERN = /^[\p{L}\d_-]{1,32}$/u;
 
 export function SentenceToken({
   label,
@@ -217,36 +217,39 @@ export function PriorityEditor({
 }
 
 export function TagEditor({
-  tag,
+  tags,
   onChange,
   close,
 }: {
-  tag: string | null;
-  onChange(tag: string | null): void;
+  tags: string[];
+  onChange(tags: string[]): void;
   close(): void;
 }) {
-  const [value, setValue] = useState(tag ?? "");
+  const [value, setValue] = useState(tags.map((t) => `#${t}`).join(", "));
 
   const commit = () => {
-    const clean = value.trim().replace(/^#/, "").toLowerCase();
-    if (clean === "") onChange(null);
-    else if (TAG_PATTERN.test(clean)) onChange(clean);
-    else return false;
-    return true;
+    const next = parseTags(value);
+    if (next.join() !== tags.join()) onChange(next);
   };
 
   return (
-    <Input
-      aria-label="Tag"
-      placeholder="work"
-      value={value}
-      autoFocus
-      onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && commit()) close();
-      }}
-      onBlur={commit}
-    />
+    <>
+      <Input
+        aria-label="Tags"
+        placeholder="work, home"
+        value={value}
+        autoFocus
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            commit();
+            close();
+          }
+        }}
+        onBlur={commit}
+      />
+      <p className="font-mono text-[11px] text-ash-dim">Separate tags with commas or spaces.</p>
+    </>
   );
 }
