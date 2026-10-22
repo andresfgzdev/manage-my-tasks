@@ -1,39 +1,78 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { CalendarDays, Inbox, Plus, Sun, SunMedium } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo } from "react";
+import { useAppMenu } from "@/components/ds/app-menu";
+import type { MenuItem } from "@/components/ds/app-menu";
 import { LensTabs } from "@/components/ds/lens-tabs";
-import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
 import { lensCounts } from "@/features/tasks/domain/spine";
 import { toIsoDate } from "@/features/tasks/domain/time";
 import { DayHeader } from "./day-header";
+import { useQuickAdd } from "./quick-add";
+
+// Warms the calendar chunk while the browser is idle, so opening Week is instant.
+const warmWeek = () => import("@/features/calendar/week-calendar");
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const router = useRouter();
   const now = useNow();
   const { tasks } = useTasks();
-  const counts = now ? lensCounts(tasks, toIsoDate(now)) : null;
-  const isWeek = pathname === "/week";
+  const menu = useAppMenu();
+  const { focus } = useQuickAdd();
+  const today = now ? toIsoDate(now) : null;
+  const counts = useMemo(() => (today ? lensCounts(tasks, today) : null), [tasks, today]);
+
+  useEffect(() => {
+    const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+      .requestIdleCallback;
+    const handle = idle ? idle(warmWeek) : window.setTimeout(warmWeek, 1500);
+    return () => {
+      if (!idle) clearTimeout(handle);
+    };
+  }, []);
+
+  const tabs = useMemo(
+    () => [
+      { href: "/today", label: "Today", count: counts?.today },
+      { href: "/next", label: "Next", count: counts?.next },
+      { href: "/inbox", label: "Inbox", count: counts?.inbox },
+      { href: "/week", label: "Week", onWarm: warmWeek },
+    ],
+    [counts],
+  );
+
+  // Right click on the page itself (tasks and the calendar bring their own menus).
+  const onContextMenu = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("input, textarea, [contenteditable=true]")) return;
+    const go = (href: string) => () => router.push(href);
+    const items: MenuItem[] = [
+      { type: "action", label: "New task", icon: <Plus />, hint: "Line", run: focus },
+      { type: "separator" },
+      { type: "action", label: "Today", icon: <Sun />, run: go("/today") },
+      { type: "action", label: "Next", icon: <SunMedium />, run: go("/next") },
+      { type: "action", label: "Inbox", icon: <Inbox />, run: go("/inbox") },
+      { type: "action", label: "Week", icon: <CalendarDays />, run: go("/week") },
+    ];
+    e.preventDefault();
+    menu.open({ kind: "point", x: e.clientX, y: e.clientY }, items);
+  };
 
   return (
-    <div className="min-h-dvh px-6 pt-10 max-sm:px-4">
-      <div
-        className={cn(
-          "mx-auto flex flex-col gap-7",
-          isWeek ? "max-w-[1360px]" : "max-w-[1120px]",
-        )}
-      >
-        {!isWeek && <DayHeader />}
-        <LensTabs
-          items={[
-            { href: "/today", label: "Today", count: counts?.today },
-            { href: "/next", label: "Next", count: counts?.next },
-            { href: "/inbox", label: "Inbox", count: counts?.inbox },
-            { href: "/week", label: "Week" },
-          ]}
-        />
-        {children}
+    <div className="min-h-dvh px-6 pt-10 max-sm:px-4" onContextMenu={onContextMenu}>
+      {/* One width for every view: switching tabs never moves the header or the tabs. */}
+      <div className="mx-auto flex max-w-[1360px] flex-col gap-7">
+        <div className="animate-rise" style={{ animationDelay: "0ms" }}>
+          <DayHeader />
+        </div>
+        <div className="animate-rise" style={{ animationDelay: "70ms" }}>
+          <LensTabs items={tabs} />
+        </div>
+        <div className="animate-rise" style={{ animationDelay: "140ms" }}>
+          {children}
+        </div>
       </div>
     </div>
   );

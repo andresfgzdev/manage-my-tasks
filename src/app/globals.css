@@ -36,6 +36,11 @@
   --animate-chip-in: chip-in 180ms var(--ease-out-strong) both;
   --animate-wash: wash 1400ms ease-out both;
   --animate-pop: pop 520ms var(--ease-out-strong) both;
+  --animate-view-in: view-in 320ms var(--ease-out-strong) both;
+  --animate-rise: rise 420ms var(--ease-out-strong) both;
+  --animate-fade-in: fade-in 200ms ease-out both;
+  --animate-menu-in: menu-in 140ms var(--ease-out-strong) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
 /* shadcn: its semantic variables point at the palette (dark only) */
@@ -94,6 +99,26 @@
   from { transform: scale(0.97); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-sodium) 70%, transparent); }
   to { transform: none; box-shadow: 0 0 0 0 transparent; }
 }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
 @keyframes now-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-sodium) 35%, transparent); }
   50% { box-shadow: 0 0 0 6px transparent; }
@@ -118,8 +143,45 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Reserve the scrollbar so short and tall views have the same width. */
+    scrollbar-gutter: stable;
+    scrollbar-color: var(--color-line) transparent;
+  }
   body {
     @apply bg-ground text-bone font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    position: relative;
+  }
+  /* Ambient backdrop: a dot grid that fades out from the top, plus two soft
+     glows. One fixed layer, painted once: no animation, no layout cost. */
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  body::before {
+    background:
+      radial-gradient(60rem 28rem at 50% -8%, color-mix(in srgb, var(--color-sodium) 11%, transparent), transparent 70%),
+      radial-gradient(44rem 26rem at 100% 100%, color-mix(in srgb, var(--color-ice) 7%, transparent), transparent 70%);
+  }
+  body::after {
+    background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-bone) 13%, transparent) 1px, transparent 0) 0 0 / 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+    mask-image: radial-gradient(ellipse 85% 75% at 50% 0%, #000 25%, transparent 100%);
+  }
+}
+
+/* Interactive surfaces share one fast, GPU-only feel. */
+@utility lift {
+  transition: transform 160ms var(--ease-out-strong), box-shadow 160ms var(--ease-out-strong), background-color 160ms, border-color 160ms;
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+    }
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { Calendar, X } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Chip } from "@/components/ds/chip";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/features/tasks/client/use-now";
@@ -19,10 +19,15 @@ export type QuickAddApi = {
   pending: Range | null;
   setPendingRange(range: Range | null): void;
   focus(): void;
+  /** Appends a piece of Line syntax to the input (the cheat sheet and hint chips use it). */
+  insert(snippet: string): void;
 };
 
 type QuickAddState = QuickAddApi & {
   inputRef: React.RefObject<HTMLInputElement | null>;
+  // The Line owns its text; it registers how to append to it here, so typing
+  // never re-renders the views that only need `insert`.
+  insertRef: React.RefObject<(snippet: string) => void>;
 };
 
 const QuickAddContext = createContext<QuickAddState | null>(null);
@@ -30,19 +35,21 @@ const QuickAddContext = createContext<QuickAddState | null>(null);
 export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<Range | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const insertRef = useRef<(snippet: string) => void>(() => {});
 
-  return (
-    <QuickAddContext.Provider
-      value={{
-        pending,
-        inputRef,
-        setPendingRange: setPending,
-        focus: () => inputRef.current?.focus(),
-      }}
-    >
-      {children}
-    </QuickAddContext.Provider>
+  const value = useMemo<QuickAddState>(
+    () => ({
+      pending,
+      inputRef,
+      insertRef,
+      setPendingRange: setPending,
+      focus: () => inputRef.current?.focus(),
+      insert: (snippet) => insertRef.current(snippet),
+    }),
+    [pending],
   );
+
+  return <QuickAddContext.Provider value={value}>{children}</QuickAddContext.Provider>;
 }
 
 function useQuickAddState(): QuickAddState {
@@ -52,19 +59,25 @@ function useQuickAddState(): QuickAddState {
 }
 
 export function useQuickAdd(): QuickAddApi {
-  const { pending, setPendingRange, focus } = useQuickAddState();
-  return { pending, setPendingRange, focus };
+  const { pending, setPendingRange, focus, insert } = useQuickAddState();
+  return { pending, setPendingRange, focus, insert };
 }
 
 const KIND_LABEL: Record<LineTokenKind, string> = {
-  time: "time",
-  duration: "for",
+  time: "at",
+  duration: "lasts",
   priority: "priority",
   tag: "tag",
   day: "day",
 };
 
-const HINTS = ["15:30", "~45m", "!!", "#tag", "tomorrow"];
+const HINTS = [
+  { snippet: "15:30", title: "Start time, or a range like 13:30 to 15:30" },
+  { snippet: "~45m", title: "Duration: ~45m, ~2h" },
+  { snippet: "!!", title: "Priority: ! low, !! medium, !!! high" },
+  { snippet: "#work,home", title: "Tags: separate several with commas" },
+  { snippet: "tomorrow", title: "Day: today or tomorrow" },
+];
 
 function describeRange(range: Range): string {
   const [y, m, d] = range.date.split("-").map(Number);
@@ -74,7 +87,7 @@ function describeRange(range: Range): string {
 }
 
 export function QuickAdd() {
-  const { pending, setPendingRange, inputRef } = useQuickAddState();
+  const { pending, setPendingRange, inputRef, insertRef, insert } = useQuickAddState();
   const pathname = usePathname();
   const now = useNow();
   const actions = useTaskActions();
@@ -86,6 +99,17 @@ export function QuickAdd() {
   // A range picked on the calendar only applies while the calendar is showing.
   const range = isWeek ? pending : null;
   const parsed = parseLine(text, toIsoDate(now ?? new Date(0)));
+
+  // The Line is ready as soon as the page opens.
+  useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, [inputRef]);
+  useEffect(() => {
+    insertRef.current = (snippet) => {
+      setText((current) => (current && !current.endsWith(" ") ? `${current} ` : current) + snippet);
+      inputRef.current?.focus();
+    };
+  }, [insertRef, inputRef]);
 
   const clear = () => {
     setText("");
@@ -110,7 +134,7 @@ export function QuickAdd() {
       startMin,
       durationMin: range?.durationMin ?? line.durationMin,
       priority: line.priority,
-      tag: line.tag,
+      tags: line.tags,
     });
     clear();
   };
@@ -178,20 +202,35 @@ export function QuickAdd() {
             </div>
           )}
           {text.trim() === ""
-            ? !range && HINTS.map((hint) => <Chip key={hint} tone="hint">{hint}</Chip>)
+            ? !range &&
+              HINTS.map((hint) => (
+                <Chip
+                  key={hint.snippet}
+                  tone="hint"
+                  title={hint.title}
+                  onClick={() => insert(`${hint.snippet} `)}
+                >
+                  {hint.snippet}
+                </Chip>
+              ))
             : parsed.tokens.map((token) => (
                 <Chip
-                  key={token.kind}
+                  key={`${token.kind}-${token.label}`}
                   tone={token.kind === "time" || token.kind === "day" ? "sodium" : "neutral"}
                   kind={KIND_LABEL[token.kind]}
                 >
                   {token.label}
                 </Chip>
               ))}
+          {parsed.startMin !== null && parsed.durationMin === 0 && !range && (
+            <Chip tone="hint" title="Add a duration, or write a range like 13:30 to 15:30" onClick={() => insert("~1h ")}>
+              + add ~1h to set a duration
+            </Chip>
+          )}
         </div>
 
         {needsTime && (
-          <p role="status" className="pl-7 font-mono text-[11px] text-ash-dim">
+          <p role="status" className="animate-fade-in pl-7 font-mono text-[11px] text-ash-dim">
             Missing a time: select a block or type a time like 15:30.
           </p>
         )}

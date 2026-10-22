@@ -4,7 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-type Item = { href: string; label: string; count?: number; disabled?: boolean };
+type Item = {
+  href: string;
+  label: string;
+  count?: number;
+  disabled?: boolean;
+  // Called on hover/focus/touch to warm whatever the view needs.
+  onWarm?(): void;
+};
 
 const ITEM = "inline-flex h-11 w-28 items-center justify-center text-sm";
 
@@ -25,9 +32,12 @@ export function LensTabs({ items, activeHref }: { items: Item[]; activeHref?: st
             key={item.href}
             href={item.href}
             aria-current={item.href === active ? "page" : undefined}
+            onPointerEnter={item.onWarm}
+            onFocus={item.onWarm}
+            onTouchStart={item.onWarm}
             className={cn(
               ITEM,
-              "press text-ash transition-colors hover:text-bone aria-[current=page]:text-bone",
+              "press text-ash transition-colors duration-200 hover:text-bone aria-[current=page]:text-bone",
             )}
           >
             {item.label}

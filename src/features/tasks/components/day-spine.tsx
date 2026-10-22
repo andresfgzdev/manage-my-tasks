@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { NowMarker } from "@/components/ds/now-marker";
 import { useNow } from "@/features/tasks/client/use-now";
 import { useTasks } from "@/features/tasks/client/use-tasks";
@@ -13,6 +13,15 @@ export function DaySpine({ lens }: { lens: Lens }) {
   const now = useNow();
   const { tasks, isLoading, isError } = useTasks();
   const [openId, setOpenId] = useState<string | null>(null);
+
+  const open = useCallback((id: string) => setOpenId(id), []);
+  const close = useCallback(() => setOpenId(null), []);
+  const todayIso = now ? toIsoDate(now) : null;
+  const nowMin = now ? now.getHours() * 60 + now.getMinutes() : 0;
+  const items = useMemo(
+    () => (todayIso ? buildSpine(tasks, lens, todayIso, nowMin) : []),
+    [tasks, lens, todayIso, nowMin],
+  );
 
   const root = "min-w-0 flex-[999_1_560px] pb-[280px]";
 
@@ -29,14 +38,17 @@ export function DaySpine({ lens }: { lens: Lens }) {
       <div className={root} aria-busy="true">
         <div className="flex flex-col gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[60px] rounded-row bg-surface/60" />
+            <div
+              key={i}
+              className="h-[60px] animate-shimmer rounded-row bg-surface/60"
+              style={{ animationDelay: `${i * 120}ms` }}
+            />
           ))}
         </div>
       </div>
     );
   }
 
-  const items = buildSpine(tasks, lens, toIsoDate(now), now.getHours() * 60 + now.getMinutes());
   const hasTasks = items.some((item) => item.type === "task");
   let rowIndex = 0;
 
@@ -60,14 +72,14 @@ export function DaySpine({ lens }: { lens: Lens }) {
               overdue={item.overdue}
               index={rowIndex++}
               open={openId === item.task.id}
-              onOpen={() => setOpenId(item.task.id)}
-              onClose={() => setOpenId(null)}
+              onOpen={open}
+              onClose={close}
             />
           );
         })}
       </div>
       {!hasTasks && (
-        <div className="flex flex-col gap-1.5 py-12 pl-[90px]">
+        <div className="flex animate-view-in flex-col gap-1.5 py-12 pl-[90px]">
           <span className="text-lg font-semibold">Nothing here.</span>
           <span className="text-sm text-ash">
             Type in the line below; anything with a time lands in its slot.
