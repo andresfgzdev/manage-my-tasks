@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildSpine, daySummary, defaultDateFor, hourLoad, lensCounts } from "./spine.ts";
+import { buildSpine, daySummary, defaultDateFor, hourLoad, hourPlan, lensCounts } from "./spine.ts";
 import type { SpineItem } from "./spine.ts";
 import type { Task } from "./task.ts";
 
@@ -17,7 +17,7 @@ function task(over: Partial<Task>): Task {
     startMin: null,
     durationMin: 0,
     priority: 0,
-    tag: null,
+    tags: [],
     done: false,
     steps: [],
     note: "",
@@ -135,6 +135,18 @@ test("hourLoad counts tasks overlapping each hour", () => {
   ];
   assert.deepEqual(hourLoad(tasks, TODAY, 7, 10), [1, 2, 0]);
   assert.equal(hourLoad(tasks, TODAY, 7, 23).length, 16);
+});
+
+test("hourPlan sums the minutes each hour is booked", () => {
+  const tasks = [
+    task({ startMin: 7 * 60 + 30, durationMin: 60 }),
+    task({ startMin: 8 * 60, durationMin: 0 }),
+  ];
+  assert.deepEqual(hourPlan(tasks, TODAY, 7, 10), [
+    { blocks: 1, minutes: 30 },
+    { blocks: 2, minutes: 45 },
+    { blocks: 0, minutes: 0 },
+  ]);
 });
 
 test("defaultDateFor", () => {

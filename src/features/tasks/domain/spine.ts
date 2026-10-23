@@ -107,3 +107,31 @@ export function defaultDateFor(lens: Lens, today: string): string | null {
   if (lens === "next") return addDays(today, 1);
   return null;
 }
+
+/** Blocks and planned minutes that fall inside each hour of today, for [fromH, toH). */
+export function hourPlan(
+  tasks: Task[],
+  today: string,
+  fromH: number,
+  toH: number,
+): { blocks: number; minutes: number }[] {
+  const timed = tasks.filter((t) => t.date === today && t.startMin !== null);
+  const plan: { blocks: number; minutes: number }[] = [];
+  for (let h = fromH; h < toH; h++) {
+    const from = h * 60;
+    const to = from + 60;
+    let blocks = 0;
+    let minutes = 0;
+    for (const t of timed) {
+      const start = t.startMin as number;
+      const end = start + Math.max(t.durationMin, 15);
+      const overlap = Math.min(end, to) - Math.max(start, from);
+      if (overlap > 0) {
+        blocks += 1;
+        minutes += overlap;
+      }
+    }
+    plan.push({ blocks, minutes });
+  }
+  return plan;
+}
